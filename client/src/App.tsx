@@ -92,7 +92,8 @@ function App() {
       const formData = new FormData();
       formData.append('image', selectedImage);
 
-      const response = await fetch('/api/analyze', {
+      const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+      const response = await fetch(`${apiBase}/analyze`, {
         method: 'POST',
         body: formData,
       });
