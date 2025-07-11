@@ -4,6 +4,14 @@ import { Upload, Camera, Loader2, AlertCircle, CheckCircle } from 'lucide-react'
 interface AnalysisResult {
   foodItems: string[];
   totalCalories: number;
+  nutritionFacts?: {
+    protein_g?: number;
+    fat_g?: number;
+    carbohydrates_g?: number;
+    [key: string]: number | undefined;
+  };
+  servingSize?: string;
+  confidenceScore?: number;
   explanation: string;
 }
 
@@ -242,6 +250,11 @@ function App() {
                   <h2 className="text-xl font-semibold text-gray-800">
                     Analysis Results
                   </h2>
+                  {typeof result.confidenceScore === 'number' && (
+                    <span className="ml-3 px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-semibold">
+                      Confidence: {(result.confidenceScore * 100).toFixed(0)}%
+                    </span>
+                  )}
                 </div>
 
                 {/* Fallback Warning */}
@@ -263,7 +276,35 @@ function App() {
                       {result.totalCalories.toLocaleString()}
                     </p>
                     <p className="text-emerald-100 text-sm">calories</p>
+                    {result.servingSize && (
+                      <p className="text-emerald-50 text-xs mt-2">Serving Size: {result.servingSize}</p>
+                    )}
                   </div>
+                  {/* Nutrition Facts Table */}
+                  {result.nutritionFacts && (
+                    <div className="mt-6">
+                      <h4 className="text-lg font-semibold text-white mb-2">Nutrition Facts</h4>
+                      <table className="w-full text-white text-sm">
+                        <tbody>
+                          {Object.entries(result.nutritionFacts).map(([key, value]) => {
+                            let label = key;
+                            if (label.endsWith('_g')) {
+                              label = label.replace(/_g$/, '') + ' (g)';
+                            } else {
+                              label = label.replace(/_/g, ' ');
+                            }
+                            label = label.charAt(0).toUpperCase() + label.slice(1);
+                            return (
+                              <tr key={key}>
+                                <td className="pr-4 capitalize">{label}</td>
+                                <td className="text-right font-mono">{typeof value === 'number' ? value : '-'}</td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
                 </div>
 
                 {/* Food Items */}

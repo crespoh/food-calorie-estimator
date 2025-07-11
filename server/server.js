@@ -63,19 +63,35 @@ app.post('/api/analyze', upload.single('image'), async (req, res) => {
     const mimeType = req.file.mimetype;
 
     // Create the prompt for calorie estimation
-    const prompt = `You are a helpful assistant that identifies food and estimates calories from a photo. 
+    const prompt = `You are a helpful assistant that identifies food and estimates nutritional information from a photo.
 
-Please analyze this image and provide:
-1. A list of food items you can identify
+Please analyze this image and return:
+1. A list of identifiable food items
 2. An estimated total calorie count
-3. A brief explanation of your estimation
+3. A nutrition facts breakdown, including:
+   - Protein (g)
+   - Fat (g)
+   - Carbohydrates (g)
+   - (Include other nutrients if clearly identifiable, like fiber or sugar)
+4. Serving size (e.g., 1 plate, 1 bowl, 100g), if possible
+5. A confidence score (0–1) representing how certain you are about the identification and estimation
+6. A brief explanation of how you arrived at these estimates
 
-Be concise but informative. If you can't clearly identify the food, say so and provide a general estimate based on what you can see.
+If the food is unclear, say so and provide general estimates based on visual clues.
 
-Format your response as a JSON object with the following structure:
+Format your response as a JSON object like this:
 {
   "foodItems": ["item1", "item2", ...],
   "totalCalories": number,
+  "nutritionFacts": {
+    "protein_g": number,
+    "fat_g": number,
+    "carbohydrates_g": number,
+    "fiber_g": number,
+    "sugar_g": number
+  },
+  "servingSize": "string",
+  "confidenceScore": number,
   "explanation": "your explanation here"
 }`;
 
