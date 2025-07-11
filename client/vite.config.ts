@@ -12,7 +12,7 @@ export default defineConfig({
   build: {
     outDir: 'dist',         // ✅ required by Vercel
     emptyOutDir: true,
-  }
+  },
   server: {
     proxy: {
       '/api': {
