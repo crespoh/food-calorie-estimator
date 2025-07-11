@@ -10,13 +10,13 @@ export default defineConfig({
     exclude: ['lucide-react'],
   },
   build: {
-    outDir: path.resolve(__dirname, "server/public"),
+    outDir: 'dist',         // ✅ required by Vercel
     emptyOutDir: true,
-  },
+  }
   server: {
     proxy: {
       '/api': {
-        target: 'http://localhost:3000',
+        target: 'https://food-calorie-estimator-production.up.railway.app',
         changeOrigin: true,
       },
     },
