@@ -101,25 +101,55 @@ Format your response as a JSON object with the following structure:
       temperature: 0.1,
     });
 
-    const result = response.choices[0].message.content;
-    
+    let resultText = response.choices[0].message.content;
+    // Remove code block markers if present
+    if (typeof resultText === 'string') {
+      resultText = resultText.trim();
+      // Remove ```json ... ``` or ``` ... ```
+      if (resultText.startsWith('```')) {
+        resultText = resultText.replace(/^```json\s*|^```\s*|```$/gim, '');
+        // Remove trailing triple backticks if present
+        resultText = resultText.replace(/```$/g, '').trim();
+      }
+    }
+
     // Try to parse JSON response
     let parsedResult;
+    let isFallback = false;
     try {
-      parsedResult = JSON.parse(result);
+      parsedResult = JSON.parse(resultText);
     } catch (parseError) {
       // If JSON parsing fails, create a structured response
       parsedResult = {
         foodItems: ["Food items identified"],
         totalCalories: 0,
-        explanation: result
+        explanation: response.choices[0].message.content,
+        fallback: true
       };
+      isFallback = true;
+    }
+
+    // If parsedResult is missing required fields, treat as fallback
+    if (
+      !parsedResult.foodItems ||
+      !Array.isArray(parsedResult.foodItems) ||
+      typeof parsedResult.totalCalories !== 'number' ||
+      typeof parsedResult.explanation !== 'string'
+    ) {
+      parsedResult = {
+        foodItems: ["Food items identified"],
+        totalCalories: 0,
+        explanation: typeof resultText === 'string' ? resultText : 'Could not parse analysis result.',
+        fallback: true
+      };
+      isFallback = true;
     }
 
     res.json({
       success: true,
       result: parsedResult,
-      usage: response.usage
+      usage: response.usage,
+      fallback: isFallback
     });
 
   } catch (error) {

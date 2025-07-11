@@ -26,6 +26,7 @@ function App() {
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [isFallback, setIsFallback] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleImageSelect = (file: File) => {
@@ -77,6 +78,7 @@ function App() {
 
     setLoading(true);
     setError(null);
+    setIsFallback(false);
 
     try {
       const formData = new FormData();
@@ -87,7 +89,7 @@ function App() {
         body: formData,
       });
 
-      const data: ApiResponse = await response.json();
+      const data: ApiResponse & { fallback?: boolean } = await response.json();
 
       if (!response.ok) {
         throw new Error(data.error || 'Failed to analyze image');
@@ -95,6 +97,7 @@ function App() {
 
       if (data.success && data.result) {
         setResult(data.result);
+        setIsFallback(Boolean(data.fallback) || Boolean((data.result as any).fallback));
       } else {
         throw new Error('Invalid response format');
       }
@@ -240,6 +243,17 @@ function App() {
                     Analysis Results
                   </h2>
                 </div>
+
+                {/* Fallback Warning */}
+                {isFallback && (
+                  <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg flex items-start gap-3">
+                    <AlertCircle className="w-5 h-5 text-yellow-500 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-yellow-800 font-medium">AI could not fully parse the result</p>
+                      <p className="text-yellow-700 text-sm">The analysis result may be incomplete or not in the expected format. Please try another image or re-upload for better results.</p>
+                    </div>
+                  </div>
+                )}
 
                 {/* Calorie Count */}
                 <div className="bg-gradient-to-r from-emerald-500 to-blue-500 text-white rounded-lg p-6 mb-6">
