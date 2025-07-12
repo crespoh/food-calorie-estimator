@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { Upload, Camera, Loader2, AlertCircle, CheckCircle } from 'lucide-react';
+import html2canvas from 'html2canvas';
 
 interface AnalysisResult {
   foodItems: string[];
@@ -36,6 +37,7 @@ function App() {
   const [isDragging, setIsDragging] = useState(false);
   const [isFallback, setIsFallback] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [copySuccess, setCopySuccess] = useState<string | null>(null);
 
   const handleImageSelect = (file: File) => {
     if (file && file.type.startsWith('image/')) {
@@ -124,6 +126,35 @@ function App() {
     setError(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
+    }
+  };
+
+  // Handler for Download Result as PNG
+  const handleDownloadResult = async () => {
+    const resultElement = document.getElementById('result');
+    if (!resultElement) return;
+    try {
+      const canvas = await html2canvas(resultElement, { backgroundColor: '#fff', scale: 2 });
+      const dataUrl = canvas.toDataURL('image/png');
+      const link = document.createElement('a');
+      link.href = dataUrl;
+      link.download = 'food-calorie-estimate.png';
+      link.click();
+    } catch (err) {
+      alert('Failed to download image. Please try again or screenshot manually.');
+    }
+  };
+
+  // Handler for Copy Result JSON
+  const handleCopyResult = async () => {
+    if (!result) return;
+    try {
+      await navigator.clipboard.writeText(JSON.stringify(result, null, 2));
+      setCopySuccess('Copied!');
+      setTimeout(() => setCopySuccess(null), 1500);
+    } catch (err) {
+      setCopySuccess('Failed to copy');
+      setTimeout(() => setCopySuccess(null), 1500);
     }
   };
 
@@ -246,64 +277,84 @@ function App() {
           <div className="space-y-6">
             {result && (
               <>
-                {/* Food Items Card */}
-                <div className="bg-white rounded-xl shadow-lg p-6 mb-4">
-                  <div className="flex items-center gap-2 mb-3">
-                    <span className="text-2xl">🍽</span>
-                    <h3 className="text-lg font-semibold text-gray-800">Identified Food Items</h3>
+                <div id="result">
+                  {/* Food Items Card */}
+                  <div className="bg-white rounded-xl shadow-lg p-6 mb-4">
+                    <div className="flex items-center gap-2 mb-3">
+                      <span className="text-2xl">🍽</span>
+                      <h3 className="text-lg font-semibold text-gray-800">Identified Food Items</h3>
+                    </div>
+                    <ul className="list-disc list-inside text-gray-700 text-base pl-2">
+                      {result.foodItems && result.foodItems.length > 0 ? (
+                        result.foodItems.map((item, idx) => (
+                          <li key={idx}>{item}</li>
+                        ))
+                      ) : (
+                        <li>No food items identified.</li>
+                      )}
+                    </ul>
                   </div>
-                  <ul className="list-disc list-inside text-gray-700 text-base pl-2">
-                    {result.foodItems && result.foodItems.length > 0 ? (
-                      result.foodItems.map((item, idx) => (
-                        <li key={idx}>{item}</li>
-                      ))
-                    ) : (
-                      <li>No food items identified.</li>
+
+                  {/* Nutrition Table Card */}
+                  <div className="bg-white rounded-xl shadow-lg p-6 mb-4">
+                    <div className="flex items-center gap-2 mb-3">
+                      <span className="text-2xl">🥗</span>
+                      <h3 className="text-lg font-semibold text-gray-800">Nutrition Facts</h3>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full text-sm text-gray-700">
+                        <thead>
+                          <tr className="border-b">
+                            <th className="py-2 px-4 text-left">Calories</th>
+                            <th className="py-2 px-4 text-left">Protein (g)</th>
+                            <th className="py-2 px-4 text-left">Carbs (g)</th>
+                            <th className="py-2 px-4 text-left">Fat (g)</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr>
+                            <td className="py-2 px-4 font-mono">{result.totalCalories ?? '-'}</td>
+                            <td className="py-2 px-4 font-mono">{result.nutritionFacts?.protein_g ?? '-'}</td>
+                            <td className="py-2 px-4 font-mono">{result.nutritionFacts?.carbohydrates_g ?? '-'}</td>
+                            <td className="py-2 px-4 font-mono">{result.nutritionFacts?.fat_g ?? '-'}</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                    {result.servingSize && (
+                      <div className="mt-2 text-xs text-gray-500">Serving Size: {result.servingSize}</div>
                     )}
-                  </ul>
+                    {typeof result.confidenceScore === 'number' && (
+                      <div className="mt-2 text-xs text-blue-600">Confidence: {(result.confidenceScore * 100).toFixed(0)}%</div>
+                    )}
+                  </div>
+
+                  {/* Explanation Card */}
+                  <div className="bg-white rounded-xl shadow-lg p-6 mb-4">
+                    <div className="flex items-center gap-2 mb-3">
+                      <span className="text-2xl">💬</span>
+                      <h3 className="text-lg font-semibold text-gray-800">Explanation</h3>
+                    </div>
+                    <p className="text-gray-700 leading-relaxed whitespace-pre-line">{result.explanation}</p>
+                  </div>
                 </div>
 
-                {/* Nutrition Table Card */}
-                <div className="bg-white rounded-xl shadow-lg p-6 mb-4">
-                  <div className="flex items-center gap-2 mb-3">
-                    <span className="text-2xl">🥗</span>
-                    <h3 className="text-lg font-semibold text-gray-800">Nutrition Facts</h3>
-                  </div>
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full text-sm text-gray-700">
-                      <thead>
-                        <tr className="border-b">
-                          <th className="py-2 px-4 text-left">Calories</th>
-                          <th className="py-2 px-4 text-left">Protein (g)</th>
-                          <th className="py-2 px-4 text-left">Carbs (g)</th>
-                          <th className="py-2 px-4 text-left">Fat (g)</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr>
-                          <td className="py-2 px-4 font-mono">{result.totalCalories ?? '-'}</td>
-                          <td className="py-2 px-4 font-mono">{result.nutritionFacts?.protein_g ?? '-'}</td>
-                          <td className="py-2 px-4 font-mono">{result.nutritionFacts?.carbohydrates_g ?? '-'}</td>
-                          <td className="py-2 px-4 font-mono">{result.nutritionFacts?.fat_g ?? '-'}</td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                  {result.servingSize && (
-                    <div className="mt-2 text-xs text-gray-500">Serving Size: {result.servingSize}</div>
-                  )}
-                  {typeof result.confidenceScore === 'number' && (
-                    <div className="mt-2 text-xs text-blue-600">Confidence: {(result.confidenceScore * 100).toFixed(0)}%</div>
-                  )}
-                </div>
-
-                {/* Explanation Card */}
-                <div className="bg-white rounded-xl shadow-lg p-6 mb-4">
-                  <div className="flex items-center gap-2 mb-3">
-                    <span className="text-2xl">💬</span>
-                    <h3 className="text-lg font-semibold text-gray-800">Explanation</h3>
-                  </div>
-                  <p className="text-gray-700 leading-relaxed whitespace-pre-line">{result.explanation}</p>
+                {/* Download / Copy Buttons */}
+                <div className="flex flex-col sm:flex-row gap-3 mt-2 mb-4">
+                  <button
+                    onClick={handleDownloadResult}
+                    className="flex-1 bg-blue-600 text-white py-3 px-6 rounded-lg font-medium hover:bg-blue-700 transition-colors duration-200 flex items-center justify-center gap-2"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V4" /></svg>
+                    Download Result
+                  </button>
+                  <button
+                    onClick={handleCopyResult}
+                    className="flex-1 bg-emerald-600 text-white py-3 px-6 rounded-lg font-medium hover:bg-emerald-700 transition-colors duration-200 flex items-center justify-center gap-2"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16h8M8 12h8m-7 8h6a2 2 0 002-2V6a2 2 0 00-2-2H7a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                    {copySuccess ? copySuccess : 'Copy Result'}
+                  </button>
                 </div>
 
                 {/* Reset Button */}
