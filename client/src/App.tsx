@@ -151,6 +151,46 @@ function simpleHash(str: string): string {
   return hash.toString();
 }
 
+// Helper: Resize image to max 512px (maintain aspect ratio), return Blob
+async function resizeImage(file: File, maxSize = 512): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    const img = new window.Image();
+    img.onload = () => {
+      let { width, height } = img;
+      if (width > maxSize || height > maxSize) {
+        if (width > height) {
+          height = Math.round((height * maxSize) / width);
+          width = maxSize;
+        } else {
+          width = Math.round((width * maxSize) / height);
+          height = maxSize;
+        }
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return reject(new Error('Canvas not supported'));
+      ctx.drawImage(img, 0, 0, width, height);
+      canvas.toBlob(
+        (blob) => {
+          if (blob) resolve(blob);
+          else reject(new Error('Image compression failed'));
+        },
+        'image/jpeg',
+        0.85 // quality
+      );
+    };
+    img.onerror = reject;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      img.src = e.target?.result as string;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
 function App() {
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
@@ -231,8 +271,11 @@ function App() {
     setIsFallback(false);
 
     try {
+      // Compress the image before sending
+      const compressedBlob = await resizeImage(selectedImage, 512);
+      const compressedFile = new File([compressedBlob], selectedImage.name, { type: compressedBlob.type });
       const formData = new FormData();
-      formData.append('image', selectedImage);
+      formData.append('image', compressedFile);
 
       const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:3000';
       const response = await fetch(`${apiBase}/analyze`, {
