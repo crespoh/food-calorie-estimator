@@ -54,6 +54,77 @@ const ImageHistory: React.FC<ImageHistoryProps> = ({ images, onSelect }) => (
   </div>
 );
 
+// Feedback component
+interface FeedbackProps {
+  imageId: string;
+  result: AnalysisResult;
+}
+
+const Feedback: React.FC<FeedbackProps> = ({ imageId, result }) => {
+  const [feedbackGiven, setFeedbackGiven] = useState<boolean>(() => {
+    const stored = localStorage.getItem('feedbacks');
+    if (!stored) return false;
+    const feedbacks = JSON.parse(stored) as any[];
+    return feedbacks.some(fb => fb.imageId === imageId);
+  });
+  const [thankYou, setThankYou] = useState(false);
+
+  // Stub for sending feedback to API
+  const sendFeedback = async (feedbackObj: any) => {
+    // Replace with real API call in the future
+    console.log('Feedback sent to API:', feedbackObj);
+  };
+
+  const handleFeedback = (feedback: 'yes' | 'no') => {
+    if (feedbackGiven) return;
+    const feedbackObj = {
+      imageId,
+      timestamp: Date.now(),
+      response: result,
+      feedback,
+    };
+    // Save to localStorage
+    const stored = localStorage.getItem('feedbacks');
+    const feedbacks = stored ? JSON.parse(stored) : [];
+    feedbacks.push(feedbackObj);
+    localStorage.setItem('feedbacks', JSON.stringify(feedbacks));
+    setFeedbackGiven(true);
+    setThankYou(true);
+    sendFeedback(feedbackObj);
+    setTimeout(() => setThankYou(false), 2000);
+  };
+
+  return (
+    <div className="mt-4 flex flex-col items-center">
+      {!feedbackGiven && !thankYou && (
+        <div className="flex flex-col items-center gap-2">
+          <span className="text-gray-700 font-medium mb-1">Was this accurate?</span>
+          <div className="flex gap-4">
+            <button
+              onClick={() => handleFeedback('yes')}
+              className="flex items-center gap-1 px-4 py-2 bg-emerald-100 hover:bg-emerald-200 text-emerald-700 rounded-lg font-semibold transition"
+            >
+              <span className="text-xl">👍</span> Yes
+            </button>
+            <button
+              onClick={() => handleFeedback('no')}
+              className="flex items-center gap-1 px-4 py-2 bg-red-100 hover:bg-red-200 text-red-700 rounded-lg font-semibold transition"
+            >
+              <span className="text-xl">👎</span> No
+            </button>
+          </div>
+        </div>
+      )}
+      {thankYou && (
+        <div className="text-emerald-700 font-semibold py-2">Thank you for your feedback!</div>
+      )}
+      {feedbackGiven && !thankYou && (
+        <div className="text-gray-500 text-sm py-2">Feedback already submitted for this result.</div>
+      )}
+    </div>
+  );
+};
+
 // Helper: Convert base64 dataURL to File
 function dataURLtoFile(dataUrl: string, filename: string): File {
   const arr = dataUrl.split(',');
@@ -66,6 +137,18 @@ function dataURLtoFile(dataUrl: string, filename: string): File {
     u8arr[n] = bstr.charCodeAt(n);
   }
   return new File([u8arr], filename, { type: mime });
+}
+
+// Helper: Simple hash for imageId (base64 or result JSON)
+function simpleHash(str: string): string {
+  let hash = 0, i, chr;
+  if (str.length === 0) return hash.toString();
+  for (i = 0; i < str.length; i++) {
+    chr = str.charCodeAt(i);
+    hash = ((hash << 5) - hash) + chr;
+    hash |= 0; // Convert to 32bit integer
+  }
+  return hash.toString();
 }
 
 function App() {
@@ -427,6 +510,12 @@ function App() {
                     {copySuccess ? copySuccess : 'Copy Result'}
                   </button>
                 </div>
+
+                {/* Feedback Section */}
+                <Feedback
+                  imageId={simpleHash(imagePreview || JSON.stringify(result))}
+                  result={result}
+                />
 
                 {/* Reset Button */}
                 <button
