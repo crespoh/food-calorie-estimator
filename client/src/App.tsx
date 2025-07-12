@@ -28,6 +28,32 @@ interface ApiResponse {
   type?: string;
 }
 
+// ImageHistory component
+interface ImageHistoryProps {
+  images: string[];
+  onSelect: (img: string) => void;
+}
+
+const ImageHistory: React.FC<ImageHistoryProps> = ({ images, onSelect }) => (
+  <div className="mt-4 flex gap-2 overflow-x-auto">
+    {images.map((img, idx) => (
+      <button
+        key={idx}
+        className="focus:outline-none border-2 border-transparent focus:border-emerald-500 rounded-lg p-0.5 transition"
+        onClick={() => onSelect(img)}
+        aria-label={`Preview image ${idx + 1}`}
+        type="button"
+      >
+        <img
+          src={img}
+          alt={`History ${idx + 1}`}
+          className="w-16 h-16 object-cover rounded-lg shadow-sm hover:scale-105 transition-transform"
+        />
+      </button>
+    ))}
+  </div>
+);
+
 function App() {
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
@@ -39,6 +65,21 @@ function App() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [copySuccess, setCopySuccess] = useState<string | null>(null);
 
+  // Image history state
+  const [imageHistory, setImageHistory] = useState<string[]>(() => {
+    const stored = localStorage.getItem('imageHistory');
+    return stored ? JSON.parse(stored) : [];
+  });
+
+  // Helper to update localStorage and state
+  const updateImageHistory = (newImg: string) => {
+    let updated = [newImg, ...imageHistory.filter((img) => img !== newImg)];
+    if (updated.length > 3) updated = updated.slice(0, 3);
+    setImageHistory(updated);
+    localStorage.setItem('imageHistory', JSON.stringify(updated));
+  };
+
+  // When a new image is selected/uploaded, add to history
   const handleImageSelect = (file: File) => {
     if (file && file.type.startsWith('image/')) {
       setSelectedImage(file);
@@ -48,7 +89,9 @@ function App() {
       // Create preview
       const reader = new FileReader();
       reader.onload = (e) => {
-        setImagePreview(e.target?.result as string);
+        const imgUrl = e.target?.result as string;
+        setImagePreview(imgUrl);
+        updateImageHistory(imgUrl);
       };
       reader.readAsDataURL(file);
     } else {
@@ -158,6 +201,14 @@ function App() {
     }
   };
 
+  // Handler for clicking a history thumbnail
+  const handleHistorySelect = (img: string) => {
+    setImagePreview(img);
+    setSelectedImage(null); // Prevents accidental re-upload
+    setResult(null);
+    setError(null);
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-blue-50">
       <div className="container mx-auto px-4 py-8 max-w-4xl">
@@ -219,6 +270,10 @@ function App() {
                   </div>
                 )}
               </div>
+              {/* Image History Thumbnails */}
+              {imageHistory.length > 0 && (
+                <ImageHistory images={imageHistory} onSelect={handleHistorySelect} />
+              )}
 
               {/* File Input */}
               <input
