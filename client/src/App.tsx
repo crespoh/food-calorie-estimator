@@ -245,104 +245,75 @@ function App() {
           {/* Results Section */}
           <div className="space-y-6">
             {result && (
-              <div className="bg-white rounded-xl shadow-lg p-6">
-                <div className="flex items-center gap-3 mb-4">
-                  <CheckCircle className="w-6 h-6 text-green-500" />
-                  <h2 className="text-xl font-semibold text-gray-800">
-                    Analysis Results
-                  </h2>
-                  {typeof result.confidenceScore === 'number' && (
-                    <span className="ml-3 px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-semibold">
-                      Confidence: {(result.confidenceScore * 100).toFixed(0)}%
-                    </span>
-                  )}
-                </div>
-
-                {/* Fallback Warning */}
-                {isFallback && (
-                  <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg flex items-start gap-3">
-                    <AlertCircle className="w-5 h-5 text-yellow-500 flex-shrink-0 mt-0.5" />
-                    <div>
-                      <p className="text-yellow-800 font-medium">AI could not fully parse the result</p>
-                      <p className="text-yellow-700 text-sm">The analysis result may be incomplete or not in the expected format. Please try another image or re-upload for better results.</p>
-                    </div>
+              <>
+                {/* Food Items Card */}
+                <div className="bg-white rounded-xl shadow-lg p-6 mb-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className="text-2xl">🍽</span>
+                    <h3 className="text-lg font-semibold text-gray-800">Identified Food Items</h3>
                   </div>
-                )}
-
-                {/* Calorie Count */}
-                <div className="bg-gradient-to-r from-emerald-500 to-blue-500 text-white rounded-lg p-6 mb-6">
-                  <div className="text-center">
-                    <p className="text-emerald-100 mb-2">Estimated Calories</p>
-                    <p className="text-4xl font-bold">
-                      {result.totalCalories.toLocaleString()}
-                    </p>
-                    <p className="text-emerald-100 text-sm">calories</p>
-                    {result.servingSize && (
-                      <p className="text-emerald-50 text-xs mt-2">Serving Size: {result.servingSize}</p>
+                  <ul className="list-disc list-inside text-gray-700 text-base pl-2">
+                    {result.foodItems && result.foodItems.length > 0 ? (
+                      result.foodItems.map((item, idx) => (
+                        <li key={idx}>{item}</li>
+                      ))
+                    ) : (
+                      <li>No food items identified.</li>
                     )}
+                  </ul>
+                </div>
+
+                {/* Nutrition Table Card */}
+                <div className="bg-white rounded-xl shadow-lg p-6 mb-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className="text-2xl">🥗</span>
+                    <h3 className="text-lg font-semibold text-gray-800">Nutrition Facts</h3>
                   </div>
-                  {/* Nutrition Facts Table */}
-                  {result.nutritionFacts && (
-                    <div className="mt-6">
-                      <h4 className="text-lg font-semibold text-white mb-2">Nutrition Facts</h4>
-                      <table className="w-full text-white text-sm">
-                        <tbody>
-                          {Object.entries(result.nutritionFacts).map(([key, value]) => {
-                            let label = key;
-                            if (label.endsWith('_g')) {
-                              label = label.replace(/_g$/, '') + ' (g)';
-                            } else {
-                              label = label.replace(/_/g, ' ');
-                            }
-                            label = label.charAt(0).toUpperCase() + label.slice(1);
-                            return (
-                              <tr key={key}>
-                                <td className="pr-4 capitalize">{label}</td>
-                                <td className="text-right font-mono">{typeof value === 'number' ? value : '-'}</td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full text-sm text-gray-700">
+                      <thead>
+                        <tr className="border-b">
+                          <th className="py-2 px-4 text-left">Calories</th>
+                          <th className="py-2 px-4 text-left">Protein (g)</th>
+                          <th className="py-2 px-4 text-left">Carbs (g)</th>
+                          <th className="py-2 px-4 text-left">Fat (g)</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr>
+                          <td className="py-2 px-4 font-mono">{result.totalCalories ?? '-'}</td>
+                          <td className="py-2 px-4 font-mono">{result.nutritionFacts?.protein_g ?? '-'}</td>
+                          <td className="py-2 px-4 font-mono">{result.nutritionFacts?.carbohydrates_g ?? '-'}</td>
+                          <td className="py-2 px-4 font-mono">{result.nutritionFacts?.fat_g ?? '-'}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                  {result.servingSize && (
+                    <div className="mt-2 text-xs text-gray-500">Serving Size: {result.servingSize}</div>
+                  )}
+                  {typeof result.confidenceScore === 'number' && (
+                    <div className="mt-2 text-xs text-blue-600">Confidence: {(result.confidenceScore * 100).toFixed(0)}%</div>
                   )}
                 </div>
 
-                {/* Food Items */}
-                <div className="mb-6">
-                  <h3 className="text-lg font-semibold text-gray-800 mb-3">
-                    Identified Food Items
-                  </h3>
-                  <div className="flex flex-wrap gap-2">
-                    {result.foodItems.map((item, index) => (
-                      <span
-                        key={index}
-                        className="bg-emerald-100 text-emerald-800 px-3 py-1 rounded-full text-sm font-medium"
-                      >
-                        {item}
-                      </span>
-                    ))}
+                {/* Explanation Card */}
+                <div className="bg-white rounded-xl shadow-lg p-6 mb-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className="text-2xl">💬</span>
+                    <h3 className="text-lg font-semibold text-gray-800">Explanation</h3>
                   </div>
-                </div>
-
-                {/* Explanation */}
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-800 mb-3">
-                    Analysis Explanation
-                  </h3>
-                  <p className="text-gray-700 leading-relaxed">
-                    {result.explanation}
-                  </p>
+                  <p className="text-gray-700 leading-relaxed whitespace-pre-line">{result.explanation}</p>
                 </div>
 
                 {/* Reset Button */}
                 <button
                   onClick={resetApp}
-                  className="w-full mt-6 bg-gray-100 text-gray-700 py-3 px-6 rounded-lg font-medium hover:bg-gray-200 transition-colors duration-200"
+                  className="w-full mt-2 bg-gray-100 text-gray-700 py-3 px-6 rounded-lg font-medium hover:bg-gray-200 transition-colors duration-200"
                 >
                   Analyze Another Image
                 </button>
-              </div>
+              </>
             )}
 
             {/* Instructions */}
