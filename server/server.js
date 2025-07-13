@@ -6,6 +6,7 @@ import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
+import { createClient } from '@supabase/supabase-js';
 
 // ES module dirname equivalent
 const __filename = fileURLToPath(import.meta.url);
@@ -20,6 +21,12 @@ const PORT = process.env.PORT || 3000;
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
+
+// Initialize Supabase
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY
+);
 
 // Middleware
 app.use(cors());
@@ -159,6 +166,21 @@ Format your response as a JSON object like this:
         fallback: true
       };
       isFallback = true;
+    }
+
+    // Save result to Supabase
+    try {
+      await supabase.from('calorie_results').insert([
+        {
+          user_id: 'anonymous',
+          image_url: 'inline',
+          food_items: parsedResult.foodItems,
+          total_calories: parsedResult.totalCalories,
+          explanation: parsedResult.explanation,
+        },
+      ]);
+    } catch (supabaseError) {
+      console.error('Failed to insert calorie result into Supabase:', supabaseError);
     }
 
     res.json({
