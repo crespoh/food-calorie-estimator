@@ -13,7 +13,7 @@ interface CalorieResult {
   food_items: string[];
   total_calories: number;
   explanation: string;
-  nutrition_facts?: {
+  nutrition_table?: {
     protein_g?: number;
     fat_g?: number;
     carbohydrates_g?: number;
