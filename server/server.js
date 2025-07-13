@@ -170,7 +170,7 @@ Format your response as a JSON object like this:
 
     // Save result to Supabase
     try {
-      await supabase.from('calorie_results').insert([
+      const { error, data } = await supabase.from('calorie_results').insert([
         {
           user_id: 'anonymous',
           image_url: 'inline',
@@ -179,6 +179,11 @@ Format your response as a JSON object like this:
           explanation: parsedResult.explanation,
         },
       ]);
+      if (error) {
+        console.error('Supabase insert error:', error);
+      } else {
+        console.log('Supabase insert success:', data);
+      }
     } catch (supabaseError) {
       console.error('Failed to insert calorie result into Supabase:', supabaseError);
     }
