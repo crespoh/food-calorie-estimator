@@ -177,6 +177,7 @@ Format your response as a JSON object like this:
           food_items: parsedResult.foodItems,
           total_calories: parsedResult.totalCalories,
           explanation: parsedResult.explanation,
+          nutrition: parsedResult.nutritionFacts || null,
         },
       ]);
       if (error) {
