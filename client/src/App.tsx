@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { Upload, Camera, Loader2, AlertCircle, CheckCircle } from 'lucide-react';
 import html2canvas from 'html2canvas';
+import History from './components/History';
 
 interface AnalysisResult {
   foodItems: string[];
@@ -426,6 +427,8 @@ function App() {
                 </div>
               )}
             </div>
+            {/* Add History component below upload form */}
+            <History />
           </div>
 
           {/* Results Section */}
