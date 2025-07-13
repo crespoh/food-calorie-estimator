@@ -180,6 +180,7 @@ Format your response as a JSON object like this:
           nutrition_table: parsedResult.nutritionFacts || null,
         },
       ]);
+      console.log("🧾 Supabase Insert Result:", { data, error });
       if (error) {
         console.error('Supabase insert error:', error);
       } else {
