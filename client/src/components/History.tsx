@@ -22,7 +22,7 @@ interface CalorieResult {
   image_url?: string;
 }
 
-const NutritionTable: React.FC<{ facts?: CalorieResult['nutrition_facts'] }> = ({ facts }) => {
+const NutritionTable: React.FC<{ facts?: CalorieResult['nutrition_table'] }> = ({ facts }) => {
   if (!facts) return null;
   const keys = Object.keys(facts);
   if (keys.length === 0) return null;
@@ -57,7 +57,7 @@ const History: React.FC = () => {
       setError(null);
       const { data, error } = await supabase
         .from('calorie_results')
-        .select('id,created_at,food_items,total_calories,explanation,nutrition_facts,image_url')
+        .select('id,created_at,food_items,total_calories,explanation,nutrition_table,image_url')
         .order('created_at', { ascending: false })
         .limit(10);
       if (error) {
@@ -101,7 +101,7 @@ const History: React.FC = () => {
                 <span className="font-semibold text-gray-700">Total Calories:</span>
                 <span className="ml-2 text-blue-700 font-mono">{res.total_calories ?? '-'}</span>
               </div>
-              {res.nutrition_facts && <NutritionTable facts={res.nutrition_facts} />}
+              {res.nutrition_table && <NutritionTable facts={res.nutrition_table} />}
               <div className="mt-2 text-xs text-gray-500">{res.explanation}</div>
             </div>
           </div>
