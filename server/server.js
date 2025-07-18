@@ -172,7 +172,7 @@ Format your response as a JSON object like this:
     try {
       const { error, data } = await supabase.from('calorie_results').insert([
         {
-          user_id: '00000000-0000-0000-0000-000000000000', // anonymous UUID
+          user_id: req.body.user_id || '00000000-0000-0000-0000-000000000000',
           image_url: 'inline',
           food_items: parsedResult.foodItems,
           total_calories: parsedResult.totalCalories,

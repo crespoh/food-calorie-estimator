@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { Upload, Camera, Loader2, AlertCircle, CheckCircle } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import History from './components/History';
+import { useAuth } from './AuthContext';
 
 interface AnalysisResult {
   foodItems: string[];
@@ -169,6 +170,8 @@ function App() {
     return stored ? JSON.parse(stored) : [];
   });
 
+  const { user, loading: authLoading, loginWithGoogle, logout } = useAuth();
+
   // Helper to update localStorage and state
   const updateImageHistory = (newImg: string) => {
     let updated = [newImg, ...imageHistory.filter((img) => img !== newImg)];
@@ -224,6 +227,7 @@ function App() {
     }
   };
 
+  // In analyzeImage, pass user id to backend
   const analyzeImage = async () => {
     if (!selectedImage) return;
 
@@ -235,6 +239,9 @@ function App() {
       // Use the original file directly
       const formData = new FormData();
       formData.append('image', selectedImage);
+      if (user?.id) {
+        formData.append('user_id', user.id);
+      }
 
       const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:3000';
       const response = await fetch(`${apiBase}/analyze`, {
@@ -325,6 +332,29 @@ function App() {
             Upload a photo of your food and get an instant calorie estimate powered by AI. 
             Perfect for tracking your nutrition on the go.
           </p>
+          {/* Auth UI */}
+          <div className="mt-4 flex flex-col items-center gap-2">
+            {authLoading ? (
+              <span className="text-gray-400 text-sm">Checking login...</span>
+            ) : user ? (
+              <>
+                <span className="text-emerald-700 text-sm">Logged in as {user.email}</span>
+                <button
+                  onClick={logout}
+                  className="mt-1 px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg text-sm font-medium"
+                >
+                  Logout
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={loginWithGoogle}
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-medium"
+              >
+                Login with Google
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="grid gap-8 lg:grid-cols-2">
