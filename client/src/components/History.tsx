@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../supabaseClient';
+import { useAuth } from '../AuthContext';
 
 interface CalorieResult {
   id: string;
@@ -41,6 +42,7 @@ const NutritionTable: React.FC<{ facts?: CalorieResult['nutrition_table'] }> = (
 };
 
 const History: React.FC = () => {
+  const { user } = useAuth();
   const [results, setResults] = useState<CalorieResult[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -49,22 +51,39 @@ const History: React.FC = () => {
     const fetchHistory = async () => {
       setLoading(true);
       setError(null);
-      const { data, error } = await supabase
-        .from('calorie_results')
-        .select('id,created_at,food_items,total_calories,explanation,nutrition_table,image_url')
-        .order('created_at', { ascending: false })
-        .limit(10);
-      if (error) {
-        setError(error.message);
+      if (!user) {
         setResults([]);
-      } else {
-        setResults(data || []);
+        setLoading(false);
+        return;
+      }
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        const accessToken = session?.access_token;
+        if (!accessToken) {
+          setResults([]);
+          setLoading(false);
+          return;
+        }
+        const res = await fetch('/api/user-history', {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        });
+        const json = await res.json();
+        if (json.success) {
+          setResults(json.results);
+        } else {
+          setError(json.error || 'Failed to fetch history');
+        }
+      } catch (err: any) {
+        setError(err.message || 'Failed to fetch history');
       }
       setLoading(false);
     };
     fetchHistory();
-  }, []);
+  }, [user]);
 
+  if (!user) return null;
   if (loading) {
     return <div className="text-center text-gray-500 py-8">Loading history...</div>;
   }
@@ -72,12 +91,12 @@ const History: React.FC = () => {
     return <div className="text-center text-red-500 py-8">Error: {error}</div>;
   }
   if (!results.length) {
-    return null;
+    return <div className="text-center text-gray-400 py-8">No history found for your account.</div>;
   }
 
   return (
     <div className="mt-10">
-      <h2 className="text-xl font-bold mb-4 text-gray-800">Recent Calorie Estimations</h2>
+      <h2 className="text-xl font-bold mb-4 text-gray-800">Your Calorie Estimation History</h2>
       <div className="space-y-6">
         {results.map((res) => (
           <div key={res.id} className="bg-white rounded-lg shadow p-4 flex flex-col md:flex-row md:items-center gap-4">
