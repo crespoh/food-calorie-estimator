@@ -221,6 +221,39 @@ Format your response as a JSON object like this:
   }
 });
 
+// Route to fetch calorie results for the authenticated user
+app.get('/api/user-history', async (req, res) => {
+  try {
+    const authHeader = req.headers['authorization'] || req.headers['Authorization'];
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'Missing or invalid Authorization header' });
+    }
+    const token = authHeader.replace('Bearer ', '');
+
+    // Validate JWT and get user info from Supabase
+    const { data: { user }, error: userError } = await supabase.auth.getUser(token);
+    if (userError || !user) {
+      return res.status(401).json({ error: 'Invalid or expired token' });
+    }
+    const userId = user.id;
+
+    // Query calorie_results for this user, excluding all-zero UUID
+    const { data, error } = await supabase
+      .from('calorie_results')
+      .select('*')
+      .eq('user_id', userId)
+      .neq('user_id', '00000000-0000-0000-0000-000000000000')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      return res.status(500).json({ error: error.message });
+    }
+    res.json({ success: true, results: data });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch user history', details: err.message });
+  }
+});
+
 // Health check endpoint
 app.get('/api/health', (req, res) => {
   res.json({ 
