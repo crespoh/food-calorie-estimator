@@ -30,7 +30,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const loginWithGoogle = () => {
-    supabase.auth.signInWithOAuth({ provider: 'google' });
+    supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: window.location.origin,
+      },
+    });
   };
 
   const logout = () => {
