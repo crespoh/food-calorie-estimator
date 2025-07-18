@@ -46,6 +46,7 @@ const History: React.FC = () => {
   const [results, setResults] = useState<CalorieResult[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const apiBase = import.meta.env.VITE_API_URL;
 
   useEffect(() => {
     const fetchHistory = async () => {
@@ -64,7 +65,7 @@ const History: React.FC = () => {
           setLoading(false);
           return;
         }
-        const res = await fetch('/api/user-history', {
+        const res = await fetch(`${apiBase}/api/user-history`, {
           headers: {
             Authorization: `Bearer ${accessToken}`,
           },
@@ -81,7 +82,7 @@ const History: React.FC = () => {
       setLoading(false);
     };
     fetchHistory();
-  }, [user]);
+  }, [user, apiBase]);
 
   if (!user) return null;
   if (loading) {
