@@ -1,8 +1,9 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Upload, Camera, Loader2, AlertCircle, CheckCircle } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import History from './components/History';
 import { useAuth } from './AuthContext';
+import { supabase } from './supabaseClient';
 
 interface AnalysisResult {
   foodItems: string[];
@@ -172,6 +173,16 @@ function App() {
 
   const { user, loading: authLoading, loginWithGoogle, logout } = useAuth();
 
+  // Add session state for access token
+  const [accessToken, setAccessToken] = useState<string | null>(null);
+  useEffect(() => {
+    const getToken = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      setAccessToken(session?.access_token || null);
+    };
+    getToken();
+  }, [user]);
+
   // Helper to update localStorage and state
   const updateImageHistory = (newImg: string) => {
     let updated = [newImg, ...imageHistory.filter((img) => img !== newImg)];
@@ -229,7 +240,7 @@ function App() {
 
   // In analyzeImage, pass user id to backend
   const analyzeImage = async () => {
-    if (!selectedImage) return;
+    if (!selectedImage || !user || !accessToken) return;
 
     setLoading(true);
     setError(null);
@@ -244,9 +255,12 @@ function App() {
       }
 
       const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:3000';
-      const response = await fetch(`${apiBase}/analyze`, {
+      const response = await fetch(`${apiBase}/api/analyze`, {
         method: 'POST',
         body: formData,
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
       });
 
       const data: ApiResponse & { fallback?: boolean } = await response.json();
@@ -413,6 +427,7 @@ function App() {
                 accept="image/*"
                 onChange={handleFileInputChange}
                 className="hidden"
+                disabled={!user}
               />
               
               {/* Action Buttons */}
@@ -420,12 +435,13 @@ function App() {
                 <button
                   onClick={() => fileInputRef.current?.click()}
                   className="flex-1 bg-emerald-600 text-white py-3 px-6 rounded-lg font-medium hover:bg-emerald-700 transition-colors duration-200 flex items-center justify-center gap-2"
+                  disabled={!user}
                 >
                   <Upload className="w-5 h-5" />
                   Choose Image
                 </button>
                 
-                {selectedImage && (
+                {selectedImage && user && (
                   <button
                     onClick={analyzeImage}
                     disabled={loading}
@@ -445,6 +461,13 @@ function App() {
                   </button>
                 )}
               </div>
+
+              {/* Show sign-in message if not logged in */}
+              {!user && !authLoading && (
+                <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded text-yellow-800 text-center">
+                  Please sign in to upload an image.
+                </div>
+              )}
 
               {/* Error Message */}
               {error && (

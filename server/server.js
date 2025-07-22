@@ -55,6 +55,18 @@ app.use(express.static(path.join(__dirname, '../public')));
 // API endpoint for image analysis
 app.post('/api/analyze', upload.single('image'), async (req, res) => {
   try {
+    // 1. Extract token from Authorization header
+    const authHeader = req.headers['authorization'] || req.headers['Authorization'];
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    const token = authHeader.replace('Bearer ', '');
+    // 2. Validate with Supabase
+    const { data: { user }, error: userError } = await supabase.auth.getUser(token);
+    if (userError || !user) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
     if (!req.file) {
       return res.status(400).json({ error: 'No image file provided' });
     }
@@ -172,7 +184,7 @@ Format your response as a JSON object like this:
     try {
       const { error, data } = await supabase.from('calorie_results').insert([
         {
-          user_id: req.body.user_id || '00000000-0000-0000-0000-000000000000',
+          user_id: user.id,
           image_url: 'inline',
           food_items: parsedResult.foodItems,
           total_calories: parsedResult.totalCalories,
