@@ -66,6 +66,14 @@ app.post('/api/analyze', upload.single('image'), async (req, res) => {
     if (userError || !user) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
+    
+    // 3. Check if user email is verified
+    if (!user.email_confirmed_at) {
+      return res.status(403).json({ 
+        error: 'Email verification required',
+        message: 'Please verify your email address before using this feature.'
+      });
+    }
 
     if (!req.file) {
       return res.status(400).json({ error: 'No image file provided' });
