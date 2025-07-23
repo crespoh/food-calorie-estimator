@@ -68,7 +68,7 @@ const History: React.FC = () => {
           setLoading(false);
           return;
         }
-        const res = await fetch(`${apiBase}/user-history`, {
+        const res = await fetch(`${apiBase}/api/user-history`, {
           headers: {
             Authorization: `Bearer ${accessToken}`,
           },
