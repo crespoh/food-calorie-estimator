@@ -17,16 +17,22 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Initialize OpenAI
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+// Initialize OpenAI (conditionally)
+let openai = null;
+if (process.env.OPENAI_API_KEY) {
+  openai = new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY,
+  });
+}
 
-// Initialize Supabase
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-);
+// Initialize Supabase (conditionally)
+let supabase = null;
+if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+  supabase = createClient(
+    process.env.SUPABASE_URL,
+    process.env.SUPABASE_SERVICE_ROLE_KEY
+  );
+}
 
 // Middleware
 app.use(cors());
@@ -55,6 +61,13 @@ app.use(express.static(path.join(__dirname, '../public')));
 // API endpoint for image analysis
 app.post('/api/analyze', upload.single('image'), async (req, res) => {
   try {
+    // Check if Supabase is configured for authentication
+    if (!supabase) {
+      return res.status(500).json({ 
+        error: 'Authentication service not configured. Please set up Supabase environment variables.' 
+      });
+    }
+
     // 1. Extract token from Authorization header
     const authHeader = req.headers['authorization'] || req.headers['Authorization'];
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -79,7 +92,7 @@ app.post('/api/analyze', upload.single('image'), async (req, res) => {
       return res.status(400).json({ error: 'No image file provided' });
     }
 
-    if (!process.env.OPENAI_API_KEY) {
+    if (!openai) {
       return res.status(500).json({ 
         error: 'OpenAI API key not configured. Please add your API key to the .env file.' 
       });
@@ -145,69 +158,86 @@ Format your response as a JSON object like this:
     });
 
     let resultText = response.choices[0].message.content;
-    // Remove code block markers if present
-    if (typeof resultText === 'string') {
-      resultText = resultText.trim();
-      // Remove ```json ... ``` or ``` ... ```
-      if (resultText.startsWith('```')) {
-        resultText = resultText.replace(/^```json\s*|^```\s*|```$/gim, '');
-        // Remove trailing triple backticks if present
-        resultText = resultText.replace(/```$/g, '').trim();
-      }
-    }
-
-    // Try to parse JSON response
+    
+    // Try to parse JSON response with improved handling
     let parsedResult;
     let isFallback = false;
+    
     try {
+      // Clean up the response text
+      if (typeof resultText === 'string') {
+        resultText = resultText.trim();
+        
+        // Remove various code block markers
+        resultText = resultText.replace(/^```json\s*/gim, '');
+        resultText = resultText.replace(/^```\s*/gim, '');
+        resultText = resultText.replace(/```\s*$/gim, '');
+        
+        // Also handle other common formatting issues
+        resultText = resultText.replace(/^\s*`+/gm, '');
+        resultText = resultText.replace(/`+\s*$/gm, '');
+        
+        // Try to find JSON content if it's embedded in other text
+        const jsonMatch = resultText.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          resultText = jsonMatch[0];
+        }
+      }
+      
       parsedResult = JSON.parse(resultText);
+      
+      // Validate the parsed result has required fields
+      if (!parsedResult.foodItems || !Array.isArray(parsedResult.foodItems)) {
+        throw new Error('Invalid foodItems field');
+      }
+      if (typeof parsedResult.totalCalories !== 'number') {
+        throw new Error('Invalid totalCalories field');
+      }
+      if (typeof parsedResult.explanation !== 'string') {
+        throw new Error('Invalid explanation field');
+      }
+      
     } catch (parseError) {
+      console.warn('JSON parsing failed:', parseError.message);
+      console.warn('Original response:', response.choices[0].message.content);
+      
       // If JSON parsing fails, create a structured response
       parsedResult = {
         foodItems: ["Food items identified"],
         totalCalories: 0,
-        explanation: response.choices[0].message.content,
+        explanation: response.choices[0].message.content || 'Could not parse analysis result.',
         fallback: true
       };
       isFallback = true;
     }
 
-    // If parsedResult is missing required fields, treat as fallback
-    if (
-      !parsedResult.foodItems ||
-      !Array.isArray(parsedResult.foodItems) ||
-      typeof parsedResult.totalCalories !== 'number' ||
-      typeof parsedResult.explanation !== 'string'
-    ) {
-      parsedResult = {
-        foodItems: ["Food items identified"],
-        totalCalories: 0,
-        explanation: typeof resultText === 'string' ? resultText : 'Could not parse analysis result.',
-        fallback: true
-      };
+    // Additional fallback check in case the previous validation missed something
+    if (isFallback || !parsedResult.foodItems || !parsedResult.explanation) {
       isFallback = true;
     }
 
-    // Save result to Supabase
-    try {
-      const { error, data } = await supabase.from('calorie_results').insert([
-        {
-          user_id: user.id,
-          image_url: 'inline',
-          food_items: parsedResult.foodItems,
-          total_calories: parsedResult.totalCalories,
-          explanation: parsedResult.explanation,
-          nutrition_table: parsedResult.nutritionFacts || null,
-        },
-      ]);
-      console.log("🧾 Supabase Insert Result:", { data, error });
-      if (error) {
-        console.error('Supabase insert error:', error);
-      } else {
-        console.log('Supabase insert success:', data);
+    // Save result to Supabase if available
+    if (supabase) {
+      try {
+        const { error, data } = await supabase.from('calorie_results').insert([
+          {
+            user_id: user.id,
+            image_url: 'inline',
+            food_items: parsedResult.foodItems,
+            total_calories: parsedResult.totalCalories,
+            explanation: parsedResult.explanation,
+            nutrition_table: parsedResult.nutritionFacts || null,
+          },
+        ]);
+        console.log("🧾 Supabase Insert Result:", { data, error });
+        if (error) {
+          console.error('Supabase insert error:', error);
+        } else {
+          console.log('Supabase insert success:', data);
+        }
+      } catch (supabaseError) {
+        console.error('Failed to insert calorie result into Supabase:', supabaseError);
       }
-    } catch (supabaseError) {
-      console.error('Failed to insert calorie result into Supabase:', supabaseError);
     }
 
     res.json({
@@ -244,6 +274,13 @@ Format your response as a JSON object like this:
 // Route to fetch calorie results for the authenticated user
 app.get('/api/user-history', async (req, res) => {
   try {
+    // Check if Supabase is configured
+    if (!supabase) {
+      return res.status(500).json({ 
+        error: 'Database service not configured. Please set up Supabase environment variables.' 
+      });
+    }
+
     const authHeader = req.headers['authorization'] || req.headers['Authorization'];
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return res.status(401).json({ error: 'Missing or invalid Authorization header' });
@@ -317,8 +354,15 @@ app.listen(PORT, () => {
   console.log(`📱 Frontend: http://localhost:${PORT}`);
   console.log(`🔌 API: http://localhost:${PORT}/api/health`);
   
-  if (!process.env.OPENAI_API_KEY) {
+  if (!openai) {
     console.warn('⚠️  Warning: OPENAI_API_KEY not found in environment variables');
     console.warn('   Please add your OpenAI API key to the .env file');
+    console.warn('   The analyze endpoint will not work without an API key');
+  }
+  
+  if (!supabase) {
+    console.warn('⚠️  Warning: Supabase environment variables not found');
+    console.warn('   Please add SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY to the .env file');
+    console.warn('   Authentication and history features will not work without Supabase');
   }
 });
