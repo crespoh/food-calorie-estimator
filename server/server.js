@@ -45,7 +45,7 @@ const upload = multer({
 });
 
 // Serve static files from public directory
-app.use(express.static(path.join(__dirname, '../public')));
+// app.use(express.static(path.join(__dirname, '../public')));
 
 // API endpoint for image analysis
 app.post('/api/analyze', upload.single('image'), async (req, res) => {
