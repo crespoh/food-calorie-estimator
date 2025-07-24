@@ -18,21 +18,28 @@ Please analyze this image and return:
    - Protein (g)
    - Fat (g)
    - Carbohydrates (g)
-4. A brief explanation of your analysis
+   - (Include other nutrients if clearly identifiable, like fiber or sugar)
+4. Serving size (e.g., 1 plate, 1 bowl, 100g), if possible
+5. A confidence score (0–1) representing how certain you are about the identification and estimation
+6. A brief explanation of how you arrived at these estimates
 
-Return the response as a valid JSON object with this exact structure:
+If the food is unclear, say so and provide general estimates based on visual clues.
+
+Format your response as a JSON object like this:
 {
-  "foodItems": ["item1", "item2", "item3"],
-  "totalCalories": 650,
+  "foodItems": ["item1", "item2", ...],
+  "totalCalories": number,
   "nutritionFacts": {
-    "protein_g": 35,
-    "fat_g": 28,
-    "carbohydrates_g": 55
+    "protein_g": number,
+    "fat_g": number,
+    "carbohydrates_g": number,
+    "fiber_g": number,
+    "sugar_g": number
   },
-  "explanation": "A meal of fried chicken with rice and broccoli typically contains around 650 calories..."
-}
-
-Be realistic with your estimates and only include food items you can clearly identify.`;
+  "servingSize": "string",
+  "confidenceScore": number,
+  "explanation": "your explanation here"
+}`;
 
   try {
     const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
