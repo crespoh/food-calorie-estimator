@@ -1,12 +1,12 @@
 import express from 'express';
 import multer from 'multer';
-import { OpenAI } from 'openai';
 import dotenv from 'dotenv';
 import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
 import { createClient } from '@supabase/supabase-js';
+import { analyzeImage } from './utils/llmDispatcher.js';
 
 // ES module dirname equivalent
 const __filename = fileURLToPath(import.meta.url);
@@ -16,11 +16,6 @@ dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-
-// Initialize OpenAI
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
 
 // Initialize Supabase
 const supabase = createClient(
@@ -79,116 +74,17 @@ app.post('/api/analyze', upload.single('image'), async (req, res) => {
       return res.status(400).json({ error: 'No image file provided' });
     }
 
-    if (!process.env.OPENAI_API_KEY) {
-      return res.status(500).json({ 
-        error: 'OpenAI API key not configured. Please add your API key to the .env file.' 
-      });
+    // 4. Analyze image using the LLM dispatcher
+    console.log('🔍 Starting image analysis...');
+    const analysisResult = await analyzeImage(req, req.file.buffer);
+    
+    if (!analysisResult.success) {
+      throw new Error('Analysis failed');
     }
 
-    // Convert image to base64
-    const base64Image = req.file.buffer.toString('base64');
-    const mimeType = req.file.mimetype;
+    const parsedResult = analysisResult.result;
 
-    // Create the prompt for calorie estimation
-    const prompt = `You are a helpful assistant that identifies food and estimates nutritional information from a photo.
-
-Please analyze this image and return:
-1. A list of identifiable food items
-2. An estimated total calorie count
-3. A nutrition facts breakdown, including:
-   - Protein (g)
-   - Fat (g)
-   - Carbohydrates (g)
-   - (Include other nutrients if clearly identifiable, like fiber or sugar)
-4. Serving size (e.g., 1 plate, 1 bowl, 100g), if possible
-5. A confidence score (0–1) representing how certain you are about the identification and estimation
-6. A brief explanation of how you arrived at these estimates
-
-If the food is unclear, say so and provide general estimates based on visual clues.
-
-Format your response as a JSON object like this:
-{
-  "foodItems": ["item1", "item2", ...],
-  "totalCalories": number,
-  "nutritionFacts": {
-    "protein_g": number,
-    "fat_g": number,
-    "carbohydrates_g": number,
-    "fiber_g": number,
-    "sugar_g": number
-  },
-  "servingSize": "string",
-  "confidenceScore": number,
-  "explanation": "your explanation here"
-}`;
-
-    // Call OpenAI Vision API
-    const response = await openai.chat.completions.create({
-      model: "gpt-4o",
-      messages: [
-        {
-          role: "user",
-          content: [
-            { type: "text", text: prompt },
-            {
-              type: "image_url",
-              image_url: {
-                url: `data:${mimeType};base64,${base64Image}`,
-                detail: "auto" // Use low detail to reduce costs then changed to auto
-              }
-            }
-          ]
-        }
-      ],
-      max_tokens: 300,
-      temperature: 0.1,
-    });
-
-    let resultText = response.choices[0].message.content;
-    // Remove code block markers if present
-    if (typeof resultText === 'string') {
-      resultText = resultText.trim();
-      // Remove ```json ... ``` or ``` ... ```
-      if (resultText.startsWith('```')) {
-        resultText = resultText.replace(/^```json\s*|^```\s*|```$/gim, '');
-        // Remove trailing triple backticks if present
-        resultText = resultText.replace(/```$/g, '').trim();
-      }
-    }
-
-    // Try to parse JSON response
-    let parsedResult;
-    let isFallback = false;
-    try {
-      parsedResult = JSON.parse(resultText);
-    } catch (parseError) {
-      // If JSON parsing fails, create a structured response
-      parsedResult = {
-        foodItems: ["Food items identified"],
-        totalCalories: 0,
-        explanation: response.choices[0].message.content,
-        fallback: true
-      };
-      isFallback = true;
-    }
-
-    // If parsedResult is missing required fields, treat as fallback
-    if (
-      !parsedResult.foodItems ||
-      !Array.isArray(parsedResult.foodItems) ||
-      typeof parsedResult.totalCalories !== 'number' ||
-      typeof parsedResult.explanation !== 'string'
-    ) {
-      parsedResult = {
-        foodItems: ["Food items identified"],
-        totalCalories: 0,
-        explanation: typeof resultText === 'string' ? resultText : 'Could not parse analysis result.',
-        fallback: true
-      };
-      isFallback = true;
-    }
-
-    // Save result to Supabase
+    // 5. Save result to Supabase
     try {
       const { error, data } = await supabase.from('calorie_results').insert([
         {
@@ -210,26 +106,26 @@ Format your response as a JSON object like this:
       console.error('Failed to insert calorie result into Supabase:', supabaseError);
     }
 
+    // 6. Return the analysis result
     res.json({
       success: true,
       result: parsedResult,
-      usage: response.usage,
-      fallback: isFallback
+      usage: analysisResult.usage
     });
 
   } catch (error) {
-    console.error('Error analyzing image:', error);
+    console.error('❌ Analysis error:', error);
     
-    if (error.code === 'insufficient_quota') {
-      return res.status(402).json({
-        error: 'OpenAI API quota exceeded. Please check your billing settings.',
+    if (error.message.includes('quota exceeded')) {
+      return res.status(429).json({
+        error: 'API quota exceeded. Please check your billing settings.',
         type: 'quota_exceeded'
       });
     }
     
-    if (error.code === 'invalid_api_key') {
+    if (error.message.includes('invalid_api_key') || error.message.includes('Invalid')) {
       return res.status(401).json({
-        error: 'Invalid OpenAI API key. Please check your configuration.',
+        error: 'Invalid API key. Please check your configuration.',
         type: 'invalid_key'
       });
     }
