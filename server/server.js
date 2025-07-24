@@ -134,7 +134,7 @@ Format your response as a JSON object like this:
               type: "image_url",
               image_url: {
                 url: `data:${mimeType};base64,${base64Image}`,
-                detail: "low" // Use low detail to reduce costs then changed to auto
+                detail: "auto" // Use low detail to reduce costs then changed to auto
               }
             }
           ]
