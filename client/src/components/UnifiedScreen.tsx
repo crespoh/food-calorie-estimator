@@ -250,7 +250,7 @@ const UnifiedScreen: React.FC = () => {
       }
 
       const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:3000';
-      const response = await fetch(`${apiBase}/api/analyze`, {
+      const response = await fetch(`${apiBase}/analyze`, {
         method: 'POST',
         body: formData,
         headers: {
