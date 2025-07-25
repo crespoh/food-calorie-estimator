@@ -15,6 +15,8 @@ interface CalorieResult {
     carbohydrates_g?: number;
     [key: string]: number | undefined;
   };
+  serving_size?: string;
+  confidence_score?: number;
   image_url?: string;
 }
 
@@ -193,6 +195,21 @@ const History: React.FC = () => {
                             ? res.food_items.slice(0, 2).join(', ') + (res.food_items.length > 2 ? '...' : '')
                             : 'None identified'
                           }
+                        </div>
+                        {/* Serving Size and Confidence Score */}
+                        <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
+                          {res.serving_size && (
+                            <span className="flex items-center gap-1">
+                              <span className="font-medium">Serving:</span>
+                              <span>{res.serving_size}</span>
+                            </span>
+                          )}
+                          {typeof res.confidence_score === 'number' && (
+                            <span className="flex items-center gap-1">
+                              <span className="font-medium">Confidence:</span>
+                              <span className="text-blue-600 font-medium">{(res.confidence_score * 100).toFixed(0)}%</span>
+                            </span>
+                          )}
                         </div>
                       </div>
                       <div className="flex items-center gap-2">

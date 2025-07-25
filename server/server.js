@@ -94,6 +94,8 @@ app.post('/api/analyze', upload.single('image'), async (req, res) => {
           total_calories: parsedResult.totalCalories,
           explanation: parsedResult.explanation,
           nutrition_table: parsedResult.nutritionFacts || null,
+          serving_size: parsedResult.servingSize || null,
+          confidence_score: parsedResult.confidenceScore || null,
         },
       ]);
       console.log("🧾 Supabase Insert Result:", { data, error });
