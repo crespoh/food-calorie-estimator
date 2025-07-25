@@ -531,8 +531,54 @@ const UnifiedScreen: React.FC = () => {
                             <td className="py-2 text-right font-medium">{result.nutritionFacts.fat_g}g</td>
                           </tr>
                         )}
+                        {result.nutritionFacts?.fiber_g && (
+                          <tr className="border-b border-gray-100">
+                            <td className="py-2 text-gray-600">Fiber</td>
+                            <td className="py-2 text-right font-medium">{result.nutritionFacts.fiber_g}g</td>
+                          </tr>
+                        )}
+                        {result.nutritionFacts?.sugar_g && (
+                          <tr className="border-b border-gray-100">
+                            <td className="py-2 text-gray-600">Sugar</td>
+                            <td className="py-2 text-right font-medium">{result.nutritionFacts.sugar_g}g</td>
+                          </tr>
+                        )}
+                        {/* Add any other nutrition facts that might be present */}
+                        {Object.entries(result.nutritionFacts || {}).map(([key, value]) => {
+                          // Skip already displayed nutrients
+                          if (['protein_g', 'carbohydrates_g', 'fat_g', 'fiber_g', 'sugar_g'].includes(key)) {
+                            return null;
+                          }
+                          // Display other nutrients (e.g., sodium_mg, cholesterol_mg, etc.)
+                          if (typeof value === 'number') {
+                            const displayName = key.replace(/_g$|_mg$/, '').replace(/([A-Z])/g, ' $1').toLowerCase();
+                            const unit = key.includes('_mg') ? 'mg' : 'g';
+                            return (
+                              <tr key={key} className="border-b border-gray-100">
+                                <td className="py-2 text-gray-600 capitalize">{displayName}</td>
+                                <td className="py-2 text-right font-medium">{value}{unit}</td>
+                              </tr>
+                            );
+                          }
+                          return null;
+                        })}
                       </tbody>
                     </table>
+                  </div>
+                  {/* Serving Size and Confidence Score */}
+                  <div className="mt-4 space-y-2 text-sm text-gray-600">
+                    {result.servingSize && (
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">Serving Size:</span>
+                        <span>{result.servingSize}</span>
+                      </div>
+                    )}
+                    {typeof result.confidenceScore === 'number' && (
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">Confidence:</span>
+                        <span className="text-blue-600 font-medium">{(result.confidenceScore * 100).toFixed(0)}%</span>
+                      </div>
+                    )}
                   </div>
                 </div>
 
