@@ -75,7 +75,12 @@ interface FeedbackProps {
 }
 
 const Feedback: React.FC<FeedbackProps> = ({ imageId, result }) => {
-  const [feedback, setFeedback] = useState<'yes' | 'no' | null>(null);
+  const [feedback, setFeedback] = useState<'yes' | 'no' | null>(() => {
+    // Check if feedback already exists for this imageId
+    const existingFeedback = JSON.parse(localStorage.getItem('feedback') || '[]');
+    const existing = existingFeedback.find((fb: any) => fb.imageId === imageId);
+    return existing ? existing.feedback : null;
+  });
   const [showThankYou, setShowThankYou] = useState(false);
 
   const sendFeedback = async (feedbackObj: any) => {
@@ -83,17 +88,19 @@ const Feedback: React.FC<FeedbackProps> = ({ imageId, result }) => {
     console.log('Sending feedback:', feedbackObj);
   };
 
-  const handleFeedback = (feedback: 'yes' | 'no') => {
+  console.log('Feedback component - imageId:', imageId, 'current feedback:', feedback);
+
+  const handleFeedback = (feedbackValue: 'yes' | 'no') => {
     if (feedback !== null) return; // Prevent multiple votes
     
-    setFeedback(feedback);
+    setFeedback(feedbackValue);
     setShowThankYou(true);
     
     const feedbackObj = {
       imageId,
       timestamp: new Date().toISOString(),
       response: result,
-      feedback
+      feedback: feedbackValue
     };
     
     // Save to localStorage
