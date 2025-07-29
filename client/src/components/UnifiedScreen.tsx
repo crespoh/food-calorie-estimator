@@ -276,7 +276,7 @@ const UnifiedScreen: React.FC = () => {
         headers.Authorization = `Bearer ${accessToken}`;
       }
       
-      const response = await fetch(`${apiBase}/api/analyze`, {
+      const response = await fetch(`${apiBase}/analyze`, {
         method: 'POST',
         body: formData,
         headers,
