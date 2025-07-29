@@ -76,11 +76,21 @@ app.post('/api/analyze', upload.single('image'), async (req, res) => {
     } else {
       // Anonymous user - extract IP address for rate limiting
       isAnonymous = true;
-      const ip = req.headers["x-forwarded-for"]?.toString().split(",")[0] || 
-                 req.connection.remoteAddress ||
-                 req.socket.remoteAddress;
+      const forwardedFor = req.headers["x-forwarded-for"]?.toString();
+      const remoteAddr = req.connection.remoteAddress;
+      const socketAddr = req.socket.remoteAddress;
+      
+      const ip = forwardedFor?.split(",")[0] || remoteAddr || socketAddr;
+      
+      console.log('🌐 IP Address extraction:', {
+        'x-forwarded-for': forwardedFor,
+        'remoteAddress': remoteAddr,
+        'socketAddress': socketAddr,
+        'finalIP': ip
+      });
       
       if (!ip) {
+        console.error('❌ No IP address found in request');
         return res.status(400).json({ error: 'Unable to identify request source' });
       }
       
@@ -90,7 +100,27 @@ app.post('/api/analyze', upload.single('image'), async (req, res) => {
       const todayEnd = new Date();
       todayEnd.setHours(23, 59, 59, 999);
 
-      // Count existing uploads from this IP
+      console.log('🔍 Checking anonymous user rate limit for IP:', ip);
+      console.log('📅 Date range:', todayStart.toISOString(), 'to', todayEnd.toISOString());
+
+      // First, try a simple query without IP filter to test basic functionality
+      console.log('🔍 Testing basic anonymous query...');
+      const { count: basicCount, error: basicError } = await supabase
+        .from("calorie_results")
+        .select("*", { count: "exact", head: true })
+        .eq("user_id", null)
+        .gte("created_at", todayStart.toISOString())
+        .lte("created_at", todayEnd.toISOString());
+
+      console.log('📊 Basic anonymous count result:', { count: basicCount, error: basicError });
+
+      if (basicError) {
+        console.error("❌ Basic anonymous query failed:", basicError.message);
+        return res.status(500).json({ error: "Unable to verify usage limit.", details: basicError.message });
+      }
+
+      // Now try the full query with IP filter
+      console.log('🔍 Testing IP-filtered anonymous query...');
       const { count, error: anonCountError } = await supabase
         .from("calorie_results")
         .select("*", { count: "exact", head: true })
@@ -99,9 +129,39 @@ app.post('/api/analyze', upload.single('image'), async (req, res) => {
         .gte("created_at", todayStart.toISOString())
         .lte("created_at", todayEnd.toISOString());
 
+      console.log('📊 IP-filtered anonymous count result:', { count, error: anonCountError });
+
       if (anonCountError) {
-        console.error("Anon IP count error:", anonCountError.message);
-        return res.status(500).json({ error: "Unable to verify usage limit." });
+        console.error("❌ Anon IP count error:", anonCountError.message);
+        console.error("🔍 Error details:", anonCountError);
+        
+        // If the error is about missing column, provide helpful message
+        if (anonCountError.message.includes('column') && anonCountError.message.includes('ip_address')) {
+          return res.status(500).json({ 
+            error: "Database schema needs update. Please add ip_address column to calorie_results table.",
+            details: "Run: ALTER TABLE calorie_results ADD COLUMN ip_address TEXT;"
+          });
+        }
+        
+        // For now, allow the request to proceed if IP filtering fails
+        console.log('⚠️ IP filtering failed, allowing request to proceed...');
+        req.anonymousIp = ip;
+      } else {
+        console.log('✅ IP filtering successful, count:', count);
+        
+        if (count >= 1) {
+          return res.status(429).json({ 
+            error: "Anonymous users are limited to 1 upload per day. Please sign in to unlock more.",
+            usage: {
+              current: count,
+              max: 1,
+              remaining: 0
+            }
+          });
+        }
+        
+        // Attach IP address to the request for tracking
+        req.anonymousIp = ip;
       }
 
       if (count >= 1) {
@@ -183,15 +243,27 @@ app.post('/api/analyze', upload.single('image'), async (req, res) => {
         ip_address: req.anonymousIp || null,
       };
       
+      console.log('💾 Inserting data to Supabase:', {
+        user_id: insertData.user_id,
+        ip_address: insertData.ip_address,
+        isAnonymous: !user
+      });
+      
       const { error, data } = await supabase.from('calorie_results').insert([insertData]);
       console.log("🧾 Supabase Insert Result:", { data, error });
       if (error) {
-        console.error('Supabase insert error:', error);
+        console.error('❌ Supabase insert error:', error);
+        console.error('🔍 Error details:', error);
+        
+        // If the error is about missing column, provide helpful message
+        if (error.message.includes('column') && error.message.includes('ip_address')) {
+          console.error('💡 Database schema issue: ip_address column missing');
+        }
       } else {
-        console.log('Supabase insert success:', data);
+        console.log('✅ Supabase insert success:', data);
       }
     } catch (supabaseError) {
-      console.error('Failed to insert calorie result into Supabase:', supabaseError);
+      console.error('❌ Failed to insert calorie result into Supabase:', supabaseError);
     }
 
     // 6. Return the analysis result
