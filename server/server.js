@@ -70,6 +70,40 @@ app.post('/api/analyze', upload.single('image'), async (req, res) => {
       });
     }
 
+    // 4. Check daily upload limit (3 uploads per day)
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const todayEnd = new Date();
+    todayEnd.setHours(23, 59, 59, 999);
+
+    // Query how many times this user has analyzed today
+    const { count, error: countError } = await supabase
+      .from("calorie_results")
+      .select("*", { count: "exact", head: true })
+      .eq("user_id", user.id)
+      .gte("created_at", todayStart.toISOString())
+      .lte("created_at", todayEnd.toISOString());
+
+    if (countError) {
+      console.error("Error counting user uploads:", countError.message);
+      return res.status(500).json({ error: "Server error while checking usage." });
+    }
+
+    const currentUsage = count || 0;
+    const maxUploads = 3;
+    const remainingUploads = maxUploads - currentUsage;
+
+    if (currentUsage >= maxUploads) {
+      return res.status(429).json({ 
+        error: "Daily upload limit reached (3 uploads/day).",
+        usage: {
+          current: currentUsage,
+          max: maxUploads,
+          remaining: 0
+        }
+      });
+    }
+
     if (!req.file) {
       return res.status(400).json({ error: 'No image file provided' });
     }
@@ -112,7 +146,12 @@ app.post('/api/analyze', upload.single('image'), async (req, res) => {
     res.json({
       success: true,
       result: parsedResult,
-      usage: analysisResult.usage
+      usage: analysisResult.usage,
+      dailyUsage: {
+        current: currentUsage + 1, // +1 because we're about to save this result
+        max: maxUploads,
+        remaining: remainingUploads - 1
+      }
     });
 
   } catch (error) {

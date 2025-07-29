@@ -28,6 +28,11 @@ interface ApiResponse {
     completion_tokens: number;
     total_tokens: number;
   };
+  dailyUsage?: {
+    current: number;
+    max: number;
+    remaining: number;
+  };
   error?: string;
   type?: string;
 }
@@ -182,6 +187,7 @@ const UnifiedScreen: React.FC = () => {
   const [copySuccess, setCopySuccess] = useState<string | null>(null);
   const [imageHistory, setImageHistory] = useState<string[]>([]);
   const [isFallback, setIsFallback] = useState(false);
+  const [dailyUsage, setDailyUsage] = useState<{ current: number; max: number; remaining: number } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   // Add session state for access token
@@ -274,6 +280,10 @@ const UnifiedScreen: React.FC = () => {
       if (data.success && data.result) {
         setResult(data.result);
         setIsFallback(Boolean(data.fallback) || Boolean((data.result as any).fallback));
+        // Update daily usage if provided
+        if (data.dailyUsage) {
+          setDailyUsage(data.dailyUsage);
+        }
       } else {
         throw new Error('Invalid response format');
       }
@@ -357,6 +367,18 @@ const UnifiedScreen: React.FC = () => {
                 <span>Welcome,</span>
                 <span className="font-medium">{user.email}</span>
               </div>
+              {/* Daily Usage Display */}
+              {dailyUsage && (
+                <div className="flex items-center gap-2 text-sm">
+                  <span className="text-gray-600">Daily Usage:</span>
+                  <span className={`font-medium ${dailyUsage.remaining <= 1 ? 'text-red-600' : dailyUsage.remaining <= 2 ? 'text-yellow-600' : 'text-green-600'}`}>
+                    {dailyUsage.current}/{dailyUsage.max}
+                  </span>
+                  <span className="text-gray-500">
+                    ({dailyUsage.remaining} remaining)
+                  </span>
+                </div>
+              )}
               <button
                 onClick={logout}
                 className="text-sm text-red-600 hover:text-red-700 font-medium"
@@ -371,6 +393,17 @@ const UnifiedScreen: React.FC = () => {
           {/* Upload Section */}
           <div className="space-y-6">
             <div className={`bg-white rounded-xl shadow-lg p-6 relative ${!user ? 'opacity-50' : ''}`}>
+              {/* Daily Usage Indicator */}
+              {user && dailyUsage && (
+                <div className="absolute top-4 right-4 z-10">
+                  <div className="bg-gray-100 rounded-full px-3 py-1 text-xs font-medium">
+                    <span className={dailyUsage.remaining <= 1 ? 'text-red-600' : dailyUsage.remaining <= 2 ? 'text-yellow-600' : 'text-green-600'}>
+                      {dailyUsage.remaining} left today
+                    </span>
+                  </div>
+                </div>
+              )}
+              
               {/* Overlay for non-logged in users */}
               {!user && (
                 <div className="absolute inset-0 bg-white/80 rounded-xl flex items-center justify-center z-10">
