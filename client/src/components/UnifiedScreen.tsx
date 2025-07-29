@@ -202,14 +202,21 @@ const UnifiedScreen: React.FC = () => {
 
   // Helper to update localStorage and state
   const updateImageHistory = (newImg: string) => {
+    console.log('🖼️ Updating image history with new image');
     const existing = JSON.parse(localStorage.getItem('imageHistory') || '[]');
+    console.log('📋 Existing history:', existing.length, 'images');
     const updated = [newImg, ...existing.filter((img: string) => img !== newImg)].slice(0, 3);
+    console.log('📋 Updated history:', updated.length, 'images');
     localStorage.setItem('imageHistory', JSON.stringify(updated));
     setImageHistory(updated);
   };
 
   const handleImageSelect = (file: File) => {
-    if (!user) return; // Don't allow image selection if not logged in
+    console.log('📁 Image selected:', file.name, file.size, 'bytes');
+    if (!user) {
+      console.log('❌ No user logged in, skipping image selection');
+      return; // Don't allow image selection if not logged in
+    }
     
     setSelectedImage(file);
     setResult(null);
@@ -218,6 +225,7 @@ const UnifiedScreen: React.FC = () => {
     const reader = new FileReader();
     reader.onload = (e) => {
       const imgUrl = e.target?.result as string;
+      console.log('🖼️ Image loaded, URL length:', imgUrl.length);
       setImagePreview(imgUrl);
       updateImageHistory(imgUrl);
     };
@@ -335,17 +343,21 @@ const UnifiedScreen: React.FC = () => {
 
   // Handler for clicking a history thumbnail
   const handleHistorySelect = (img: string) => {
+    console.log('🖼️ History image selected');
     setImagePreview(img);
     // Convert base64 to File so Analyze button works
     const file = dataURLtoFile(img, 'history-image.png');
     setSelectedImage(file);
     setResult(null);
     setError(null);
+    // Move this image to the top of history
+    updateImageHistory(img);
   };
 
   // Load image history from localStorage
   useEffect(() => {
     const saved = JSON.parse(localStorage.getItem('imageHistory') || '[]');
+    console.log('📋 Loading image history from localStorage:', saved.length, 'images');
     setImageHistory(saved);
   }, []);
 
@@ -504,8 +516,19 @@ const UnifiedScreen: React.FC = () => {
               )}
 
               {/* Image History */}
-              {user && imageHistory.length > 0 && (
-                <ImageHistory images={imageHistory} onSelect={handleHistorySelect} />
+              {user && (
+                <div>
+                  <div className="text-xs text-gray-500 mb-2">
+                    Debug: imageHistory.length = {imageHistory.length}
+                  </div>
+                  {imageHistory.length > 0 ? (
+                    <ImageHistory images={imageHistory} onSelect={handleHistorySelect} />
+                  ) : (
+                    <div className="text-sm text-gray-500 mt-4">
+                      No recent images. Upload an image to see it here.
+                    </div>
+                  )}
+                </div>
               )}
             </div>
           </div>
