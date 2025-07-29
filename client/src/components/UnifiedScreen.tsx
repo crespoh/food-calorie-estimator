@@ -213,10 +213,6 @@ const UnifiedScreen: React.FC = () => {
 
   const handleImageSelect = (file: File) => {
     console.log('📁 Image selected:', file.name, file.size, 'bytes');
-    if (!user) {
-      console.log('❌ No user logged in, skipping image selection');
-      return; // Don't allow image selection if not logged in
-    }
     
     setSelectedImage(file);
     setResult(null);
@@ -227,7 +223,10 @@ const UnifiedScreen: React.FC = () => {
       const imgUrl = e.target?.result as string;
       console.log('🖼️ Image loaded, URL length:', imgUrl.length);
       setImagePreview(imgUrl);
-      updateImageHistory(imgUrl);
+      // Only update history if user is logged in
+      if (user) {
+        updateImageHistory(imgUrl);
+      }
     };
     reader.readAsDataURL(file);
   };
@@ -242,7 +241,6 @@ const UnifiedScreen: React.FC = () => {
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
-    if (!user) return; // Don't allow drop if not logged in
     
     const files = e.dataTransfer.files;
     if (files.length > 0) {
@@ -258,7 +256,7 @@ const UnifiedScreen: React.FC = () => {
   };
 
   const analyzeImage = async () => {
-    if (!selectedImage || !user || !accessToken) return;
+    if (!selectedImage) return;
     setLoading(true);
     setError(null);
     setIsFallback(false);
@@ -271,12 +269,17 @@ const UnifiedScreen: React.FC = () => {
       }
 
       const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:3000';
-      const response = await fetch(`${apiBase}/analyze`, {
+      const headers: Record<string, string> = {};
+      
+      // Only add Authorization header if user is authenticated
+      if (user && accessToken) {
+        headers.Authorization = `Bearer ${accessToken}`;
+      }
+      
+      const response = await fetch(`${apiBase}/api/analyze`, {
         method: 'POST',
         body: formData,
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
+        headers,
       });
 
       const data: ApiResponse & { fallback?: boolean } = await response.json();
@@ -404,7 +407,7 @@ const UnifiedScreen: React.FC = () => {
         <div className="grid gap-8 lg:grid-cols-2">
           {/* Upload Section */}
           <div className="space-y-6">
-            <div className={`bg-white rounded-xl shadow-lg p-6 relative ${!user ? 'opacity-50' : ''}`}>
+            <div className="bg-white rounded-xl shadow-lg p-6 relative">
               {/* Daily Usage Indicator */}
               {user && dailyUsage && (
                 <div className="absolute top-4 right-4 z-10">
@@ -416,14 +419,13 @@ const UnifiedScreen: React.FC = () => {
                 </div>
               )}
               
-              {/* Overlay for non-logged in users */}
+              {/* Anonymous user indicator */}
               {!user && (
-                <div className="absolute inset-0 bg-white/80 rounded-xl flex items-center justify-center z-10">
-                  <div className="text-center">
-                    <div className="w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center mx-auto mb-3">
-                      <Upload className="w-6 h-6 text-gray-500" />
-                    </div>
-                    <p className="text-gray-600 font-medium">Sign in to use this feature</p>
+                <div className="absolute top-4 right-4 z-10">
+                  <div className="bg-orange-100 rounded-full px-3 py-1 text-xs font-medium">
+                    <span className="text-orange-600">
+                      1 free today
+                    </span>
                   </div>
                 </div>
               )}
@@ -473,7 +475,6 @@ const UnifiedScreen: React.FC = () => {
                 accept="image/*"
                 onChange={handleFileInputChange}
                 className="hidden"
-                disabled={!user}
               />
               
               {/* Action Buttons */}
@@ -481,12 +482,11 @@ const UnifiedScreen: React.FC = () => {
                 <button
                   onClick={() => fileInputRef.current?.click()}
                   className="flex-1 bg-emerald-600 text-white py-3 px-6 rounded-lg font-medium hover:bg-emerald-700 transition-colors duration-200 flex items-center justify-center gap-2"
-                  disabled={!user}
                 >
                   <Upload className="w-5 h-5" />
                   Choose Image
                 </button>
-                {selectedImage && user && (
+                {selectedImage && (
                   <button
                     onClick={analyzeImage}
                     disabled={loading}

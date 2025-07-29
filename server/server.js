@@ -50,58 +50,109 @@ const upload = multer({
 // API endpoint for image analysis
 app.post('/api/analyze', upload.single('image'), async (req, res) => {
   try {
+    let user = null;
+    let isAnonymous = false;
+    
     // 1. Extract token from Authorization header
     const authHeader = req.headers['authorization'] || req.headers['Authorization'];
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
-    const token = authHeader.replace('Bearer ', '');
-    // 2. Validate with Supabase
-    const { data: { user }, error: userError } = await supabase.auth.getUser(token);
-    if (userError || !user) {
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
+    const sessionToken = authHeader?.startsWith('Bearer ') ? authHeader.replace('Bearer ', '') : null;
     
-    // 3. Check if user email is verified
-    if (!user.email_confirmed_at) {
-      return res.status(403).json({ 
-        error: 'Email verification required',
-        message: 'Please verify your email address before using this feature.'
-      });
+    if (sessionToken) {
+      // 2. Validate with Supabase for authenticated users
+      const { data: { user: authUser }, error: userError } = await supabase.auth.getUser(sessionToken);
+      if (userError || !authUser) {
+        return res.status(401).json({ error: 'Invalid authentication token' });
+      }
+      
+      // 3. Check if user email is verified
+      if (!authUser.email_confirmed_at) {
+        return res.status(403).json({ 
+          error: 'Email verification required',
+          message: 'Please verify your email address before using this feature.'
+        });
+      }
+      
+      user = authUser;
+    } else {
+      // Anonymous user - extract IP address for rate limiting
+      isAnonymous = true;
+      const ip = req.headers["x-forwarded-for"]?.toString().split(",")[0] || 
+                 req.connection.remoteAddress ||
+                 req.socket.remoteAddress;
+      
+      if (!ip) {
+        return res.status(400).json({ error: 'Unable to identify request source' });
+      }
+      
+      // Check anonymous user rate limit (1 upload/day)
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+      const todayEnd = new Date();
+      todayEnd.setHours(23, 59, 59, 999);
+
+      // Count existing uploads from this IP
+      const { count, error: anonCountError } = await supabase
+        .from("calorie_results")
+        .select("*", { count: "exact", head: true })
+        .eq("user_id", null) // ensure it's anonymous
+        .eq("ip_address", ip)
+        .gte("created_at", todayStart.toISOString())
+        .lte("created_at", todayEnd.toISOString());
+
+      if (anonCountError) {
+        console.error("Anon IP count error:", anonCountError.message);
+        return res.status(500).json({ error: "Unable to verify usage limit." });
+      }
+
+      if (count >= 1) {
+        return res.status(429).json({ 
+          error: "Anonymous users are limited to 1 upload per day. Please sign in to unlock more.",
+          usage: {
+            current: count,
+            max: 1,
+            remaining: 0
+          }
+        });
+      }
+
+      // Attach IP address to the request for tracking
+      req.anonymousIp = ip;
     }
 
-    // 4. Check daily upload limit (3 uploads per day)
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
-    const todayEnd = new Date();
-    todayEnd.setHours(23, 59, 59, 999);
+    // 4. Check daily upload limit for authenticated users (3 uploads per day)
+    if (user) {
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+      const todayEnd = new Date();
+      todayEnd.setHours(23, 59, 59, 999);
 
-    // Query how many times this user has analyzed today
-    const { count, error: countError } = await supabase
-      .from("calorie_results")
-      .select("*", { count: "exact", head: true })
-      .eq("user_id", user.id)
-      .gte("created_at", todayStart.toISOString())
-      .lte("created_at", todayEnd.toISOString());
+      // Query how many times this user has analyzed today
+      const { count, error: countError } = await supabase
+        .from("calorie_results")
+        .select("*", { count: "exact", head: true })
+        .eq("user_id", user.id)
+        .gte("created_at", todayStart.toISOString())
+        .lte("created_at", todayEnd.toISOString());
 
-    if (countError) {
-      console.error("Error counting user uploads:", countError.message);
-      return res.status(500).json({ error: "Server error while checking usage." });
-    }
+      if (countError) {
+        console.error("Error counting user uploads:", countError.message);
+        return res.status(500).json({ error: "Server error while checking usage." });
+      }
 
-    const currentUsage = count || 0;
-    const maxUploads = 3;
-    const remainingUploads = maxUploads - currentUsage;
+      const currentUsage = count || 0;
+      const maxUploads = 3;
+      const remainingUploads = maxUploads - currentUsage;
 
-    if (currentUsage >= maxUploads) {
-      return res.status(429).json({ 
-        error: "Daily upload limit reached (3 uploads/day).",
-        usage: {
-          current: currentUsage,
-          max: maxUploads,
-          remaining: 0
-        }
-      });
+      if (currentUsage >= maxUploads) {
+        return res.status(429).json({ 
+          error: "Daily upload limit reached (3 uploads/day).",
+          usage: {
+            current: currentUsage,
+            max: maxUploads,
+            remaining: 0
+          }
+        });
+      }
     }
 
     if (!req.file) {
@@ -120,18 +171,19 @@ app.post('/api/analyze', upload.single('image'), async (req, res) => {
 
     // 5. Save result to Supabase
     try {
-      const { error, data } = await supabase.from('calorie_results').insert([
-        {
-          user_id: user.id,
-          image_url: 'inline',
-          food_items: parsedResult.foodItems,
-          total_calories: parsedResult.totalCalories,
-          explanation: parsedResult.explanation,
-          nutrition_table: parsedResult.nutritionFacts || null,
-          serving_size: parsedResult.servingSize || null,
-          confidence_score: parsedResult.confidenceScore || null,
-        },
-      ]);
+      const insertData = {
+        user_id: user?.id || null,
+        image_url: 'inline',
+        food_items: parsedResult.foodItems,
+        total_calories: parsedResult.totalCalories,
+        explanation: parsedResult.explanation,
+        nutrition_table: parsedResult.nutritionFacts || null,
+        serving_size: parsedResult.servingSize || null,
+        confidence_score: parsedResult.confidenceScore || null,
+        ip_address: req.anonymousIp || null,
+      };
+      
+      const { error, data } = await supabase.from('calorie_results').insert([insertData]);
       console.log("🧾 Supabase Insert Result:", { data, error });
       if (error) {
         console.error('Supabase insert error:', error);
@@ -143,16 +195,46 @@ app.post('/api/analyze', upload.single('image'), async (req, res) => {
     }
 
     // 6. Return the analysis result
-    res.json({
+    const responseData = {
       success: true,
       result: parsedResult,
       usage: analysisResult.usage,
-      dailyUsage: {
+    };
+    
+    // Add usage information based on user type
+    if (user) {
+      // Authenticated user - get the variables from the authenticated user check
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+      const todayEnd = new Date();
+      todayEnd.setHours(23, 59, 59, 999);
+      
+      const { count } = await supabase
+        .from("calorie_results")
+        .select("*", { count: "exact", head: true })
+        .eq("user_id", user.id)
+        .gte("created_at", todayStart.toISOString())
+        .lte("created_at", todayEnd.toISOString());
+      
+      const currentUsage = count || 0;
+      const maxUploads = 3;
+      const remainingUploads = maxUploads - currentUsage;
+      
+      responseData.dailyUsage = {
         current: currentUsage + 1, // +1 because we're about to save this result
         max: maxUploads,
         remaining: remainingUploads - 1
-      }
-    });
+      };
+    } else {
+      // Anonymous user
+      responseData.dailyUsage = {
+        current: 1,
+        max: 1,
+        remaining: 0
+      };
+    }
+    
+    res.json(responseData);
 
   } catch (error) {
     console.error('❌ Analysis error:', error);
