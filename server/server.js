@@ -119,11 +119,11 @@ app.post('/api/analyze', upload.single('image'), async (req, res) => {
         return res.status(500).json({ error: "Database connection issue.", details: testError.message });
       }
       
-      // Now try the count query
+      // Now try the count query - use is() for null values
       const { count: basicCount, error: basicError } = await supabase
         .from("calorie_results")
         .select("*", { count: "exact", head: true })
-        .eq("user_id", null)
+        .is("user_id", null)
         .gte("created_at", todayStart.toISOString())
         .lte("created_at", todayEnd.toISOString());
 
@@ -138,7 +138,7 @@ app.post('/api/analyze', upload.single('image'), async (req, res) => {
         const { data: allRecords, error: fetchError } = await supabase
           .from("calorie_results")
           .select("id, created_at, user_id, ip_address")
-          .eq("user_id", null)
+          .is("user_id", null)
           .gte("created_at", todayStart.toISOString())
           .lte("created_at", todayEnd.toISOString());
         
@@ -176,7 +176,7 @@ app.post('/api/analyze', upload.single('image'), async (req, res) => {
       const { count, error: anonCountError } = await supabase
         .from("calorie_results")
         .select("*", { count: "exact", head: true })
-        .eq("user_id", null) // ensure it's anonymous
+        .is("user_id", null) // ensure it's anonymous
         .eq("ip_address", ip)
         .gte("created_at", todayStart.toISOString())
         .lte("created_at", todayEnd.toISOString());
