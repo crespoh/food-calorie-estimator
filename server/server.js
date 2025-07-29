@@ -105,6 +105,21 @@ app.post('/api/analyze', upload.single('image'), async (req, res) => {
 
       // First, try a simple query without IP filter to test basic functionality
       console.log('🔍 Testing basic anonymous query...');
+      
+      // Try a simpler query first to test connection
+      const { data: testData, error: testError } = await supabase
+        .from("calorie_results")
+        .select("id")
+        .limit(1);
+      
+      console.log('🔍 Test query result:', { data: testData, error: testError });
+      
+      if (testError) {
+        console.error("❌ Test query failed:", testError);
+        return res.status(500).json({ error: "Database connection issue.", details: testError.message });
+      }
+      
+      // Now try the count query
       const { count: basicCount, error: basicError } = await supabase
         .from("calorie_results")
         .select("*", { count: "exact", head: true })
@@ -116,7 +131,44 @@ app.post('/api/analyze', upload.single('image'), async (req, res) => {
 
       if (basicError) {
         console.error("❌ Basic anonymous query failed:", basicError.message);
-        return res.status(500).json({ error: "Unable to verify usage limit.", details: basicError.message });
+        console.error("❌ Full error object:", basicError);
+        
+        // If the count query fails, try a different approach - get all records and count manually
+        console.log('🔄 Trying alternative approach - fetching all records...');
+        const { data: allRecords, error: fetchError } = await supabase
+          .from("calorie_results")
+          .select("id, created_at, user_id, ip_address")
+          .eq("user_id", null)
+          .gte("created_at", todayStart.toISOString())
+          .lte("created_at", todayEnd.toISOString());
+        
+        if (fetchError) {
+          console.error("❌ Alternative approach also failed:", fetchError);
+          return res.status(500).json({ error: "Unable to verify usage limit.", details: fetchError.message });
+        }
+        
+        console.log('📊 Fetched records:', allRecords?.length || 0);
+        
+        // Count records with matching IP
+        const matchingRecords = allRecords?.filter(record => record.ip_address === ip) || [];
+        const count = matchingRecords.length;
+        
+        console.log('📊 Manual count result:', { count, totalRecords: allRecords?.length || 0 });
+        
+        if (count >= 1) {
+          return res.status(429).json({ 
+            error: "Anonymous users are limited to 1 upload per day. Please sign in to unlock more.",
+            usage: {
+              current: count,
+              max: 1,
+              remaining: 0
+            }
+          });
+        }
+        
+        // Allow the request to proceed
+        req.anonymousIp = ip;
+        return; // Skip the rest of the IP filtering logic
       }
 
       // Now try the full query with IP filter
