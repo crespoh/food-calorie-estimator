@@ -7,6 +7,7 @@ import { fileURLToPath } from 'url';
 import fs from 'fs';
 import { createClient } from '@supabase/supabase-js';
 import { analyzeImage } from './utils/llmDispatcher.js';
+import { checkAndRecordUpload } from './utils/uploadLimiter.js';
 
 // ES module dirname equivalent
 const __filename = fileURLToPath(import.meta.url);
@@ -231,41 +232,8 @@ app.post('/api/analyze', upload.single('image'), async (req, res) => {
       req.anonymousIp = ip;
     }
 
-    // 4. Check daily upload limit for authenticated users (3 uploads per day)
-    if (user) {
-      const todayStart = new Date();
-      todayStart.setHours(0, 0, 0, 0);
-      const todayEnd = new Date();
-      todayEnd.setHours(23, 59, 59, 999);
-
-      // Query how many times this user has analyzed today
-      const { count, error: countError } = await supabase
-        .from("calorie_results")
-        .select("*", { count: "exact", head: true })
-        .eq("user_id", user.id)
-        .gte("created_at", todayStart.toISOString())
-        .lte("created_at", todayEnd.toISOString());
-
-      if (countError) {
-        console.error("Error counting user uploads:", countError.message);
-        return res.status(500).json({ error: "Server error while checking usage." });
-      }
-
-      const currentUsage = count || 0;
-      const maxUploads = 3;
-      const remainingUploads = maxUploads - currentUsage;
-
-      if (currentUsage >= maxUploads) {
-        return res.status(429).json({ 
-          error: "Daily upload limit reached (3 uploads/day).",
-          usage: {
-            current: currentUsage,
-            max: maxUploads,
-            remaining: 0
-          }
-        });
-      }
-    }
+    // 4. For authenticated users, we'll check the limit after analysis but before saving
+    // This prevents the race condition by making the check atomic with the insert
 
     if (!req.file) {
       return res.status(400).json({ error: 'No image file provided' });
@@ -281,42 +249,40 @@ app.post('/api/analyze', upload.single('image'), async (req, res) => {
 
     const parsedResult = analysisResult.result;
 
-    // 5. Save result to Supabase
-    try {
-      const insertData = {
-        user_id: user?.id || null,
-        image_url: 'inline',
-        food_items: parsedResult.foodItems,
-        total_calories: parsedResult.totalCalories,
-        explanation: parsedResult.explanation,
-        nutrition_table: parsedResult.nutritionFacts || null,
-        serving_size: parsedResult.servingSize || null,
-        confidence_score: parsedResult.confidenceScore || null,
-        ip_address: req.anonymousIp || null,
-      };
-      
-      console.log('💾 Inserting data to Supabase:', {
-        user_id: insertData.user_id,
-        ip_address: insertData.ip_address,
-        isAnonymous: !user
-      });
-      
-      const { error, data } = await supabase.from('calorie_results').insert([insertData]);
-      console.log("🧾 Supabase Insert Result:", { data, error });
-      if (error) {
-        console.error('❌ Supabase insert error:', error);
-        console.error('🔍 Error details:', error);
-        
-        // If the error is about missing column, provide helpful message
-        if (error.message.includes('column') && error.message.includes('ip_address')) {
-          console.error('💡 Database schema issue: ip_address column missing');
-        }
+    // 5. Save result to Supabase with atomic limit checking using the upload limiter utility
+    const insertData = {
+      user_id: user?.id || null,
+      image_url: 'inline',
+      food_items: parsedResult.foodItems,
+      total_calories: parsedResult.totalCalories,
+      explanation: parsedResult.explanation,
+      nutrition_table: parsedResult.nutritionFacts || null,
+      serving_size: parsedResult.servingSize || null,
+      confidence_score: parsedResult.confidenceScore || null,
+      ip_address: req.anonymousIp || null,
+    };
+    
+    console.log('💾 Attempting to save data with upload limit check:', {
+      user_id: insertData.user_id,
+      ip_address: insertData.ip_address,
+      isAnonymous: !user
+    });
+    
+    const uploadResult = await checkAndRecordUpload(user?.id, insertData);
+    
+    if (!uploadResult.success) {
+      if (uploadResult.error.message.includes('Daily upload limit reached')) {
+        return res.status(429).json({ 
+          error: uploadResult.error.message,
+          usage: uploadResult.usage
+        });
       } else {
-        console.log('✅ Supabase insert success:', data);
+        console.error('❌ Failed to save upload:', uploadResult.error);
+        return res.status(500).json({ error: "Server error while saving analysis." });
       }
-    } catch (supabaseError) {
-      console.error('❌ Failed to insert calorie result into Supabase:', supabaseError);
     }
+    
+    console.log('✅ Upload saved successfully:', uploadResult.data);
 
     // 6. Return the analysis result
     const responseData = {
@@ -325,37 +291,9 @@ app.post('/api/analyze', upload.single('image'), async (req, res) => {
       usage: analysisResult.usage,
     };
     
-    // Add usage information based on user type
-    if (user) {
-      // Authenticated user - get the variables from the authenticated user check
-      const todayStart = new Date();
-      todayStart.setHours(0, 0, 0, 0);
-      const todayEnd = new Date();
-      todayEnd.setHours(23, 59, 59, 999);
-      
-      const { count } = await supabase
-        .from("calorie_results")
-        .select("*", { count: "exact", head: true })
-        .eq("user_id", user.id)
-        .gte("created_at", todayStart.toISOString())
-        .lte("created_at", todayEnd.toISOString());
-      
-      const currentUsage = count || 0;
-      const maxUploads = 3;
-      const remainingUploads = maxUploads - currentUsage;
-      
-      responseData.dailyUsage = {
-        current: currentUsage + 1, // +1 because we're about to save this result
-        max: maxUploads,
-        remaining: remainingUploads - 1
-      };
-    } else {
-      // Anonymous user
-      responseData.dailyUsage = {
-        current: 1,
-        max: 1,
-        remaining: 0
-      };
+    // Add usage information from the upload result
+    if (uploadResult.usage) {
+      responseData.dailyUsage = uploadResult.usage;
     }
     
     res.json(responseData);
