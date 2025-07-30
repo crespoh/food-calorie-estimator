@@ -46,7 +46,7 @@ const upload = multer({
 });
 
 // Serve static files from public directory
-// app.use(express.static(path.join(__dirname, '../public')));
+app.use(express.static(path.join(__dirname, 'public')));
 
 // API endpoint for image analysis
 app.post('/api/analyze', upload.single('image'), async (req, res) => {
@@ -393,8 +393,13 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// Fallback route to serve React app
+// Fallback route to serve React app for all non-API routes
 app.get('*', (req, res) => {
+  // Skip API routes
+  if (req.path.startsWith('/api/')) {
+    return res.status(404).json({ error: 'API endpoint not found' });
+  }
+  
   const indexPath = path.join(__dirname, 'public', 'index.html');
   if (fs.existsSync(indexPath)) {
     res.sendFile(indexPath);

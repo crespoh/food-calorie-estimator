@@ -40,7 +40,7 @@ A lightweight, cost-efficient web application that uses OpenAI's Vision API to e
 
 4. **Start the server:**
    ```bash
-   npm run build:server
+   npm start
    ```
 
 5. **Open your browser:**
@@ -173,6 +173,12 @@ Note: These platforms don't support the full-stack setup. Use Railway or Render 
 4. **Frontend not loading**
    - Run `npm run build` first
    - Check that `public/` folder exists
+
+5. **404 Error on `/auth/callback` or other routes**
+   - This is a SPA routing issue - the server needs to serve `index.html` for all non-API routes
+   - Ensure the build process copied files to `server/public/`
+   - Check that static file serving is enabled in `server.js`
+   - The fallback route should serve React app for client-side routing
 
 ## 📄 License
 
