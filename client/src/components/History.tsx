@@ -44,7 +44,11 @@ const NutritionTable: React.FC<{ facts?: CalorieResult['nutrition_table'] }> = (
   );
 };
 
-const History: React.FC = () => {
+interface HistoryProps {
+  refreshTrigger?: number;
+}
+
+const History: React.FC<HistoryProps> = ({ refreshTrigger }) => {
   const { user } = useAuth();
   const [results, setResults] = useState<CalorieResult[]>([]);
   const [loading, setLoading] = useState(true);
@@ -87,7 +91,7 @@ const History: React.FC = () => {
       setLoading(false);
     };
     fetchHistory();
-  }, [user, apiBase]);
+  }, [user, apiBase, refreshTrigger]);
 
   const toggleHistoryExpanded = () => {
     setIsHistoryExpanded(!isHistoryExpanded);
