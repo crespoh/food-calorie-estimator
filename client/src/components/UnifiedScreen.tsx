@@ -188,6 +188,7 @@ const UnifiedScreen: React.FC = () => {
   const [imageHistory, setImageHistory] = useState<string[]>([]);
   const [isFallback, setIsFallback] = useState(false);
   const [dailyUsage, setDailyUsage] = useState<{ current: number; max: number; remaining: number } | null>(null);
+  const [historyRefreshTrigger, setHistoryRefreshTrigger] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   // Add session state for access token
@@ -199,6 +200,31 @@ const UnifiedScreen: React.FC = () => {
     };
     getToken();
   }, [user]);
+
+  // Fetch daily usage when user logs in
+  useEffect(() => {
+    const fetchDailyUsage = async () => {
+      if (!user || !accessToken) return;
+      
+      try {
+        const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+        const response = await fetch(`${apiBase}/user-usage`, {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        });
+        
+        const data = await response.json();
+        if (data.success && data.usage) {
+          setDailyUsage(data.usage);
+        }
+      } catch (error) {
+        console.error('Failed to fetch daily usage:', error);
+      }
+    };
+
+    fetchDailyUsage();
+  }, [user, accessToken]);
 
   // Helper to update localStorage and state
   const updateImageHistory = (newImg: string) => {
@@ -294,6 +320,10 @@ const UnifiedScreen: React.FC = () => {
         // Update daily usage if provided
         if (data.dailyUsage) {
           setDailyUsage(data.dailyUsage);
+        }
+        // Trigger history refresh for authenticated users
+        if (user) {
+          setHistoryRefreshTrigger(prev => prev + 1);
         }
       } else {
         throw new Error('Invalid response format');
@@ -703,7 +733,7 @@ const UnifiedScreen: React.FC = () => {
             )}
 
             {/* History Section - Show when user is logged in and verified */}
-            {user && isEmailVerified && <History />}
+            {user && isEmailVerified && <History refreshTrigger={historyRefreshTrigger} />}
           </div>
         </div>
       </div>

@@ -49,7 +49,7 @@ const upload = multer({
 // app.use(express.static(path.join(__dirname, '../public')));
 
 // API endpoint for image analysis
-app.post('/api/analyze', upload.single('image'), async (req, res) => {
+app.post('/analyze', upload.single('image'), async (req, res) => {
   try {
     let user = null;
     let isAnonymous = false;
@@ -322,8 +322,37 @@ app.post('/api/analyze', upload.single('image'), async (req, res) => {
   }
 });
 
+// Route to get current daily usage for the authenticated user
+app.get('/user-usage', async (req, res) => {
+  try {
+    const authHeader = req.headers['authorization'] || req.headers['Authorization'];
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'Missing or invalid Authorization header' });
+    }
+    const token = authHeader.replace('Bearer ', '');
+
+    // Validate JWT and get user info from Supabase
+    const { data: { user }, error: userError } = await supabase.auth.getUser(token);
+    if (userError || !user) {
+      return res.status(401).json({ error: 'Invalid or expired token' });
+    }
+
+    // Import the getCurrentUsage function
+    const { getCurrentUsage } = await import('./utils/uploadLimiter.js');
+    const usage = await getCurrentUsage(user.id);
+    
+    if (usage === null) {
+      return res.status(500).json({ error: 'Failed to fetch usage data' });
+    }
+
+    res.json({ success: true, usage });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch user usage', details: err.message });
+  }
+});
+
 // Route to fetch calorie results for the authenticated user
-app.get('/api/user-history', async (req, res) => {
+app.get('/user-history', async (req, res) => {
   try {
     const authHeader = req.headers['authorization'] || req.headers['Authorization'];
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -356,7 +385,7 @@ app.get('/api/user-history', async (req, res) => {
 });
 
 // Health check endpoint
-app.get('/api/health', (req, res) => {
+app.get('/health', (req, res) => {
   res.json({ 
     status: 'ok', 
     message: 'Food Calorie Estimator API is running',
@@ -396,7 +425,7 @@ app.use((error, req, res, next) => {
 app.listen(PORT, () => {
   console.log(`🚀 Food Calorie Estimator server running on port ${PORT}`);
   console.log(`📱 Frontend: http://localhost:${PORT}`);
-  console.log(`🔌 API: http://localhost:${PORT}/api/health`);
+  console.log(`🔌 API: http://localhost:${PORT}/health`);
   
   if (!process.env.OPENAI_API_KEY) {
     console.warn('⚠️  Warning: OPENAI_API_KEY not found in environment variables');
