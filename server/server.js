@@ -18,11 +18,21 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Initialize Supabase
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-);
+// Initialize Supabase (lazy initialization)
+let supabase = null;
+
+function getSupabaseClient() {
+  if (!supabase) {
+    if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      throw new Error('Supabase configuration is required (SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY)');
+    }
+    supabase = createClient(
+      process.env.SUPABASE_URL,
+      process.env.SUPABASE_SERVICE_ROLE_KEY
+    );
+  }
+  return supabase;
+}
 
 // Middleware
 app.use(cors());
@@ -59,8 +69,9 @@ app.post('/api/analyze', upload.single('image'), async (req, res) => {
     const sessionToken = authHeader?.startsWith('Bearer ') ? authHeader.replace('Bearer ', '') : null;
     
     if (sessionToken) {
-      // 2. Validate with Supabase for authenticated users
-      const { data: { user: authUser }, error: userError } = await supabase.auth.getUser(sessionToken);
+          // 2. Validate with Supabase for authenticated users
+    const client = getSupabaseClient();
+    const { data: { user: authUser }, error: userError } = await client.auth.getUser(sessionToken);
       if (userError || !authUser) {
         return res.status(401).json({ error: 'Invalid authentication token' });
       }
@@ -332,7 +343,8 @@ app.get('/api/user-usage', async (req, res) => {
     const token = authHeader.replace('Bearer ', '');
 
     // Validate JWT and get user info from Supabase
-    const { data: { user }, error: userError } = await supabase.auth.getUser(token);
+    const client = getSupabaseClient();
+    const { data: { user }, error: userError } = await client.auth.getUser(token);
     if (userError || !user) {
       return res.status(401).json({ error: 'Invalid or expired token' });
     }
@@ -361,14 +373,15 @@ app.get('/api/user-history', async (req, res) => {
     const token = authHeader.replace('Bearer ', '');
 
     // Validate JWT and get user info from Supabase
-    const { data: { user }, error: userError } = await supabase.auth.getUser(token);
+    const client = getSupabaseClient();
+    const { data: { user }, error: userError } = await client.auth.getUser(token);
     if (userError || !user) {
       return res.status(401).json({ error: 'Invalid or expired token' });
     }
     const userId = user.id;
 
     // Query calorie_results for this user, excluding all-zero UUID
-    const { data, error } = await supabase
+    const { data, error } = await client
       .from('calorie_results')
       .select('*')
       .eq('user_id', userId)
