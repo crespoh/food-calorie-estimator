@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Upload, Camera, Loader2, AlertCircle, CheckCircle, Clock, ChevronDown, ChevronUp } from 'lucide-react';
+import { useLocation } from 'react-router-dom';
 import html2canvas from 'html2canvas';
 import { useAuth } from '../AuthContext';
 import { supabase } from '../supabaseClient';
@@ -179,11 +180,13 @@ function simpleHash(str: string): string {
 
 const UnifiedScreen: React.FC = () => {
   const { user, loading: authLoading, loginWithGoogle, logout } = useAuth();
+  const location = useLocation();
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [authError, setAuthError] = useState<string | null>(null);
   const [copySuccess, setCopySuccess] = useState<string | null>(null);
   const [imageHistory, setImageHistory] = useState<string[]>([]);
   const [isFallback, setIsFallback] = useState(false);
@@ -191,6 +194,17 @@ const UnifiedScreen: React.FC = () => {
   const [historyRefreshTrigger, setHistoryRefreshTrigger] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
+  // Handle auth error from callback
+  useEffect(() => {
+    const state = location.state as { authError?: string } | null;
+    if (state?.authError) {
+      setAuthError(state.authError);
+      // Clear the auth error after 5 seconds
+      const timer = setTimeout(() => setAuthError(null), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [location.state]);
+
   // Add session state for access token
   const [accessToken, setAccessToken] = useState<string | null>(null);
   useEffect(() => {
@@ -695,6 +709,31 @@ const UnifiedScreen: React.FC = () => {
 
                 {/* Feedback Section */}
                 <Feedback imageId={simpleHash(imagePreview || JSON.stringify(result))} result={result} />
+              </div>
+            )}
+
+            {/* Auth Error Display */}
+            {authError && (
+              <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-6">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center">
+                    <svg className="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                    </svg>
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-sm font-semibold text-red-800">Authentication Error</h3>
+                    <p className="text-red-700 text-sm mt-1">{authError}</p>
+                  </div>
+                  <button
+                    onClick={() => setAuthError(null)}
+                    className="text-red-600 hover:text-red-800"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
               </div>
             )}
 
