@@ -1,11 +1,47 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "../supabaseClient";
 
 export default function AuthForm() {
+  const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [showResend, setShowResend] = useState(false);
+  const [isPolling, setIsPolling] = useState(false);
+
+  // Session polling effect
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    
+    if (isPolling) {
+      interval = setInterval(async () => {
+        const { data } = await supabase.auth.getUser();
+        if (data?.user) {
+          clearInterval(interval);
+          localStorage.removeItem('pending-login');
+          setIsPolling(false);
+          navigate('/');
+        }
+      }, 2000);
+    }
+
+    return () => {
+      if (interval) {
+        clearInterval(interval);
+      }
+    };
+  }, [isPolling, navigate]);
+
+  // Check for pending login on component mount
+  useEffect(() => {
+    const pendingLogin = localStorage.getItem('pending-login');
+    if (pendingLogin) {
+      setIsPolling(true);
+      setShowResend(true);
+      setMessage("Check your email for the login link! Please verify your email address before using the app.");
+    }
+  }, []);
 
   const handleLogin = async () => {
     if (!email) {
@@ -20,7 +56,7 @@ export default function AuthForm() {
       const { error } = await supabase.auth.signInWithOtp({ 
         email,
         options: {
-          emailRedirectTo: window.location.origin
+          emailRedirectTo: `${window.location.origin}/auth/callback`
         }
       });
       
@@ -28,8 +64,11 @@ export default function AuthForm() {
         setMessage(error.message);
       } else {
         setMessage("Check your email for the login link! Please verify your email address before using the app.");
+        // Store email for polling reference
+        localStorage.setItem('pending-login', email);
         setEmail("");
         setShowResend(true);
+        setIsPolling(true);
       }
     } catch (err) {
       setMessage("An unexpected error occurred. Please try again.");
@@ -52,7 +91,7 @@ export default function AuthForm() {
         type: 'signup',
         email: email,
         options: {
-          emailRedirectTo: window.location.origin
+          emailRedirectTo: `${window.location.origin}/auth/callback`
         }
       });
       
@@ -76,7 +115,7 @@ export default function AuthForm() {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: window.location.origin,
+          redirectTo: `${window.location.origin}/auth/callback`,
         },
       });
       
@@ -170,6 +209,12 @@ export default function AuthForm() {
               : 'bg-red-50 text-red-800 border border-red-200'
           }`}>
             {message}
+            {isPolling && message.includes('Check your email') && (
+              <div className="mt-2 flex items-center gap-2 text-xs text-green-700">
+                <div className="w-3 h-3 border-2 border-green-600 border-t-transparent rounded-full animate-spin"></div>
+                Waiting for you to click the link...
+              </div>
+            )}
           </div>
         )}
       </div>
