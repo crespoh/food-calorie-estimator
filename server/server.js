@@ -25,7 +25,14 @@ const supabase = createClient(
 );
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: [
+    'http://localhost:5173',  // Vite dev server
+    'http://localhost:3000',  // Local server
+    process.env.FRONTEND_URL || 'https://your-vercel-frontend-url.vercel.app'
+  ],
+  credentials: true
+}));
 app.use(express.json());
 
 // Configure multer for file uploads
