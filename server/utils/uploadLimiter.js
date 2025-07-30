@@ -1,6 +1,16 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+let supabase = null;
+
+function getSupabaseClient() {
+  if (!supabase) {
+    if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      throw new Error('Supabase configuration is required (SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY)');
+    }
+    supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+  }
+  return supabase;
+}
 
 /**
  * Atomically checks and records an upload for a user
@@ -11,7 +21,8 @@ export async function checkAndRecordUpload(userId, uploadData) {
   
   if (!userId) {
     // Anonymous users get unlimited uploads (or handle separately)
-    const { error, data } = await supabase.from('calorie_results').insert([uploadData]);
+    const client = getSupabaseClient();
+    const { error, data } = await client.from('calorie_results').insert([uploadData]);
     return {
       success: !error,
       error: error,
