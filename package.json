@@ -1,8 +1,4 @@
 {
-  "scripts": {
-    "build": "cd client && npm install && npm run build && cd ../server && mkdir -p public && cp -r ../client/dist/* public/",
-    "start": "cd server && node server.js"
-  },
   "devDependencies": {
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6"

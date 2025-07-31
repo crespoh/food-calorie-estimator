@@ -18,21 +18,11 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Initialize Supabase (lazy initialization)
-let supabase = null;
-
-function getSupabaseClient() {
-  if (!supabase) {
-    if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
-      throw new Error('Supabase configuration is required (SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY)');
-    }
-    supabase = createClient(
-      process.env.SUPABASE_URL,
-      process.env.SUPABASE_SERVICE_ROLE_KEY
-    );
-  }
-  return supabase;
-}
+// Initialize Supabase
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY
+);
 
 // Middleware
 app.use(cors());
@@ -56,7 +46,7 @@ const upload = multer({
 });
 
 // Serve static files from public directory
-app.use(express.static(path.join(__dirname, 'public')));
+// app.use(express.static(path.join(__dirname, '../public')));
 
 // API endpoint for image analysis
 app.post('/api/analyze', upload.single('image'), async (req, res) => {
@@ -69,9 +59,8 @@ app.post('/api/analyze', upload.single('image'), async (req, res) => {
     const sessionToken = authHeader?.startsWith('Bearer ') ? authHeader.replace('Bearer ', '') : null;
     
     if (sessionToken) {
-          // 2. Validate with Supabase for authenticated users
-    const client = getSupabaseClient();
-    const { data: { user: authUser }, error: userError } = await client.auth.getUser(sessionToken);
+      // 2. Validate with Supabase for authenticated users
+      const { data: { user: authUser }, error: userError } = await supabase.auth.getUser(sessionToken);
       if (userError || !authUser) {
         return res.status(401).json({ error: 'Invalid authentication token' });
       }
@@ -343,8 +332,7 @@ app.get('/api/user-usage', async (req, res) => {
     const token = authHeader.replace('Bearer ', '');
 
     // Validate JWT and get user info from Supabase
-    const client = getSupabaseClient();
-    const { data: { user }, error: userError } = await client.auth.getUser(token);
+    const { data: { user }, error: userError } = await supabase.auth.getUser(token);
     if (userError || !user) {
       return res.status(401).json({ error: 'Invalid or expired token' });
     }
@@ -373,15 +361,14 @@ app.get('/api/user-history', async (req, res) => {
     const token = authHeader.replace('Bearer ', '');
 
     // Validate JWT and get user info from Supabase
-    const client = getSupabaseClient();
-    const { data: { user }, error: userError } = await client.auth.getUser(token);
+    const { data: { user }, error: userError } = await supabase.auth.getUser(token);
     if (userError || !user) {
       return res.status(401).json({ error: 'Invalid or expired token' });
     }
     const userId = user.id;
 
     // Query calorie_results for this user, excluding all-zero UUID
-    const { data, error } = await client
+    const { data, error } = await supabase
       .from('calorie_results')
       .select('*')
       .eq('user_id', userId)
@@ -406,13 +393,8 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// Fallback route to serve React app for all non-API routes
+// Fallback route to serve React app
 app.get('*', (req, res) => {
-  // Skip API routes
-  if (req.path.startsWith('/api/')) {
-    return res.status(404).json({ error: 'API endpoint not found' });
-  }
-  
   const indexPath = path.join(__dirname, 'public', 'index.html');
   if (fs.existsSync(indexPath)) {
     res.sendFile(indexPath);

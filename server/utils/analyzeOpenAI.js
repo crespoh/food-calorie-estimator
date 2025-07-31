@@ -1,23 +1,15 @@
 import { OpenAI } from 'openai';
 
-let openai = null;
-
-function getOpenAIClient() {
-  if (!openai) {
-    if (!process.env.OPENAI_API_KEY) {
-      throw new Error('OpenAI API key not configured');
-    }
-    openai = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY,
-    });
-  }
-  return openai;
-}
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
 
 export async function analyzeImageWithOpenAI(imageBuffer, mimeType) {
   console.log('🤖 Using OpenAI GPT-4o for image analysis...');
   
-  const client = getOpenAIClient();
+  if (!process.env.OPENAI_API_KEY) {
+    throw new Error('OpenAI API key not configured');
+  }
 
   // Convert image to base64
   const base64Image = imageBuffer.toString('base64');
@@ -56,7 +48,7 @@ Format your response as a JSON object like this:
 }`;
 
   try {
-    const response = await client.chat.completions.create({
+    const response = await openai.chat.completions.create({
       model: 'gpt-4o',
       messages: [
         {
