@@ -545,10 +545,10 @@ const UnifiedScreen: React.FC = () => {
           
           {/* Auth Section */}
           {user && (
-            <div className="flex items-center justify-center gap-4 mt-4">
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-4 mt-4">
               <div className="flex items-center gap-2 text-sm text-gray-600">
                 <span>Welcome,</span>
-                <span className="font-medium">{user.email}</span>
+                <span className="font-medium truncate max-w-[150px] sm:max-w-none">{user.email}</span>
               </div>
               {/* Daily Usage Display */}
               {dailyUsage && (
