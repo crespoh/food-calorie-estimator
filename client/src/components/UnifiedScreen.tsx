@@ -23,6 +23,7 @@ interface AnalysisResult {
 interface ApiResponse {
   success: boolean;
   result: AnalysisResult;
+  resultId?: string; // Add this to store the database ID of the result
   usage?: {
     prompt_tokens: number;
     completion_tokens: number;
@@ -77,9 +78,10 @@ const ImageHistory: React.FC<ImageHistoryProps> = ({ images, onSelect }) => (
 interface FeedbackProps {
   imageId: string;
   result: AnalysisResult;
+  calorieResultId?: string; // Add this to store the actual result ID
 }
 
-const Feedback: React.FC<FeedbackProps> = ({ imageId, result }) => {
+const Feedback: React.FC<FeedbackProps> = ({ imageId, result, calorieResultId }) => {
   const [feedback, setFeedback] = useState<'yes' | 'no' | null>(() => {
     // Check if feedback already exists for this imageId
     const existingFeedback = JSON.parse(localStorage.getItem('feedback') || '[]');
@@ -97,7 +99,7 @@ const Feedback: React.FC<FeedbackProps> = ({ imageId, result }) => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          calorieResultId: feedbackObj.imageId, // Using imageId as calorieResultId for now
+          calorieResultId: calorieResultId || null, // Use actual result ID if available
           imageId: feedbackObj.imageId,
           feedback: feedbackObj.feedback,
           rating: feedbackObj.feedback === 'yes' ? 5 : 1
@@ -210,6 +212,7 @@ const UnifiedScreen: React.FC = () => {
   const [isFallback, setIsFallback] = useState(false);
   const [dailyUsage, setDailyUsage] = useState<{ current: number; max: number; remaining: number } | null>(null);
   const [historyRefreshTrigger, setHistoryRefreshTrigger] = useState(0);
+  const [currentResultId, setCurrentResultId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   // Add session state for access token
@@ -421,6 +424,10 @@ const UnifiedScreen: React.FC = () => {
         // Update daily usage if provided
         if (data.dailyUsage) {
           setDailyUsage(data.dailyUsage);
+        }
+        // Store the result ID if provided
+        if (data.resultId) {
+          setCurrentResultId(data.resultId);
         }
         // Trigger history refresh for authenticated users
         if (user) {
@@ -792,7 +799,11 @@ const UnifiedScreen: React.FC = () => {
                 </div>
 
                 {/* Feedback Section */}
-                <Feedback imageId={simpleHash(imagePreview || JSON.stringify(result))} result={result} />
+                                      <Feedback 
+                        imageId={simpleHash(imagePreview || JSON.stringify(result))} 
+                        result={result}
+                        calorieResultId={currentResultId || undefined}
+                      />
               </div>
             )}
 

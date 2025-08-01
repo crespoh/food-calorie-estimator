@@ -291,6 +291,11 @@ app.post('/api/analyze', upload.single('image'), async (req, res) => {
       usage: analysisResult.usage,
     };
     
+    // Add the result ID if the insert was successful
+    if (uploadResult.success && uploadResult.data && uploadResult.data[0]) {
+      responseData.resultId = uploadResult.data[0].id;
+    }
+    
     // Add usage information from the upload result
     if (uploadResult.usage) {
       responseData.dailyUsage = uploadResult.usage;
@@ -411,8 +416,8 @@ app.post('/api/feedback', async (req, res) => {
   try {
     const { calorieResultId, imageId, feedback, rating } = req.body;
     
-    if (!calorieResultId || !feedback) {
-      return res.status(400).json({ error: 'Missing required fields: calorieResultId and feedback' });
+    if (!feedback) {
+      return res.status(400).json({ error: 'Missing required field: feedback' });
     }
 
     // Extract user info if authenticated
@@ -427,14 +432,20 @@ app.post('/api/feedback', async (req, res) => {
     }
 
     // Insert feedback into feedback table
-    const { data, error } = await supabase.from('feedback').insert([{
-      calorie_result_id: calorieResultId,
+    const feedbackData = {
       image_id: imageId,
       user_id: userId,
       feedback: feedback,
       rating: rating || null,
       created_at: new Date().toISOString()
-    }]);
+    };
+    
+    // Only add calorie_result_id if it's provided and valid
+    if (calorieResultId && calorieResultId !== 'null') {
+      feedbackData.calorie_result_id = calorieResultId;
+    }
+    
+    const { data, error } = await supabase.from('feedback').insert([feedbackData]);
 
     if (error) {
       console.error('Feedback insert error:', error);
