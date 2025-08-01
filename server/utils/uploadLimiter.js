@@ -41,13 +41,15 @@ export async function checkAndRecordUpload(userId, insertData) {
         };
       }
 
-      // Insert the record
-      const { data, error } = await supabase.from('calorie_results').insert([insertData]);
+      // Insert the record and return the inserted data
+      const { data, error } = await supabase.from('calorie_results').insert([insertData]).select();
       
       if (error) {
         console.error('Supabase insert error:', error);
         return { success: false, error: { message: "Failed to save analysis result." } };
       }
+
+      console.log('✅ Inserted calorie result:', data);
 
       return {
         success: true,
@@ -88,13 +90,15 @@ export async function checkAndRecordUpload(userId, insertData) {
         };
       }
 
-      // Insert the record
-      const { data, error } = await supabase.from('calorie_results').insert([insertData]);
+      // Insert the record and return the inserted data
+      const { data, error } = await supabase.from('calorie_results').insert([insertData]).select();
       
       if (error) {
         console.error('Supabase insert error:', error);
         return { success: false, error: { message: "Failed to save analysis result." } };
       }
+
+      console.log('✅ Inserted anonymous calorie result:', data);
 
       return {
         success: true,
