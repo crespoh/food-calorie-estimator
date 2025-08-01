@@ -414,21 +414,30 @@ app.get('/api/user-usage', async (req, res) => {
 // Route to submit feedback
 app.post('/api/feedback', async (req, res) => {
   try {
+    console.log('📝 Feedback endpoint called with body:', req.body);
     const { calorieResultId, imageId, feedback, rating } = req.body;
     
     if (!feedback) {
+      console.log('❌ Missing feedback field');
       return res.status(400).json({ error: 'Missing required field: feedback' });
     }
 
     // Extract user info if authenticated
     let userId = null;
     const authHeader = req.headers['authorization'] || req.headers['Authorization'];
+    console.log('🔐 Auth header:', authHeader ? 'Present' : 'Missing');
+    
     if (authHeader && authHeader.startsWith('Bearer ')) {
       const token = authHeader.replace('Bearer ', '');
       const { data: { user }, error: userError } = await supabase.auth.getUser(token);
       if (!userError && user) {
         userId = user.id;
+        console.log('✅ Authenticated user:', userId);
+      } else {
+        console.log('❌ Auth error:', userError);
       }
+    } else {
+      console.log('👤 Anonymous user');
     }
 
     // Insert feedback into feedback table
@@ -444,6 +453,8 @@ app.post('/api/feedback', async (req, res) => {
     if (calorieResultId && calorieResultId !== 'null') {
       feedbackData.calorie_result_id = calorieResultId;
     }
+    
+    console.log('💾 Inserting feedback data:', feedbackData);
     
     const { data, error } = await supabase.from('feedback').insert([feedbackData]);
 

@@ -82,6 +82,7 @@ interface FeedbackProps {
 }
 
 const Feedback: React.FC<FeedbackProps> = ({ imageId, result, calorieResultId }) => {
+  const { user } = useAuth(); // Add this to get user context
   const [feedback, setFeedback] = useState<'yes' | 'no' | null>(() => {
     // Check if feedback already exists for this imageId
     const existingFeedback = JSON.parse(localStorage.getItem('feedback') || '[]');
@@ -93,11 +94,23 @@ const Feedback: React.FC<FeedbackProps> = ({ imageId, result, calorieResultId })
   const sendFeedback = async (feedbackObj: any) => {
     try {
       const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+      
+      // Get access token for authenticated requests
+      const { data: { session } } = await supabase.auth.getSession();
+      const accessToken = session?.access_token;
+      
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      
+      // Add Authorization header if user is authenticated
+      if (user && accessToken) {
+        headers.Authorization = `Bearer ${accessToken}`;
+      }
+      
       const response = await fetch(`${apiBase}/feedback`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers,
         body: JSON.stringify({
           calorieResultId: calorieResultId || null, // Use actual result ID if available
           imageId: feedbackObj.imageId,
@@ -107,9 +120,12 @@ const Feedback: React.FC<FeedbackProps> = ({ imageId, result, calorieResultId })
       });
       
       if (response.ok) {
-        console.log('✅ Feedback sent successfully');
+        console.log('✅ Feedback sent successfully to backend');
+        const responseData = await response.json();
+        console.log('📊 Backend response:', responseData);
       } else {
-        console.error('❌ Failed to send feedback');
+        const errorData = await response.json();
+        console.error('❌ Failed to send feedback:', errorData);
       }
     } catch (error) {
       console.error('❌ Error sending feedback:', error);
@@ -131,11 +147,19 @@ const Feedback: React.FC<FeedbackProps> = ({ imageId, result, calorieResultId })
       feedback: feedbackValue
     };
     
-    // Save to localStorage
+    console.log('🔄 Submitting feedback:', {
+      imageId,
+      calorieResultId,
+      feedback: feedbackValue,
+      user: user?.id || 'anonymous'
+    });
+    
+    // Save to localStorage (for backward compatibility)
     const existingFeedback = JSON.parse(localStorage.getItem('feedback') || '[]');
     existingFeedback.push(feedbackObj);
     localStorage.setItem('feedback', JSON.stringify(existingFeedback));
     
+    // Send to backend
     sendFeedback(feedbackObj);
     
     setTimeout(() => setShowThankYou(false), 3000);
