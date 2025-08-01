@@ -294,6 +294,13 @@ app.post('/api/analyze', upload.single('image'), async (req, res) => {
     // Add the result ID if the insert was successful
     if (uploadResult.success && uploadResult.data && uploadResult.data[0]) {
       responseData.resultId = uploadResult.data[0].id;
+      console.log('✅ Setting resultId in response:', responseData.resultId);
+    } else {
+      console.log('⚠️ No resultId available - uploadResult:', {
+        success: uploadResult.success,
+        hasData: !!uploadResult.data,
+        dataLength: uploadResult.data?.length
+      });
     }
     
     // Add usage information from the upload result

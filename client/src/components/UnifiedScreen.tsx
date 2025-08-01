@@ -132,7 +132,7 @@ const Feedback: React.FC<FeedbackProps> = ({ imageId, result, calorieResultId })
     }
   };
 
-  console.log('Feedback component - imageId:', imageId, 'current feedback:', feedback);
+  console.log('Feedback component - imageId:', imageId, 'calorieResultId:', calorieResultId, 'current feedback:', feedback);
 
   const handleFeedback = (feedbackValue: 'yes' | 'no') => {
     if (feedback !== null) return; // Prevent multiple votes
@@ -151,7 +151,9 @@ const Feedback: React.FC<FeedbackProps> = ({ imageId, result, calorieResultId })
       imageId,
       calorieResultId,
       feedback: feedbackValue,
-      user: user?.id || 'anonymous'
+      user: user?.id || 'anonymous',
+      hasCalorieResultId: !!calorieResultId,
+      calorieResultIdType: typeof calorieResultId
     });
     
     // Save to localStorage (for backward compatibility)
@@ -221,7 +223,8 @@ function simpleHash(str: string): string {
     hash = ((hash << 5) - hash) + char;
     hash = hash & hash; // Convert to 32-bit integer
   }
-  return hash.toString();
+  // Convert to positive string and add prefix to ensure it's always a string
+  return `img_${Math.abs(hash)}`;
 }
 
 const UnifiedScreen: React.FC = () => {
@@ -451,7 +454,10 @@ const UnifiedScreen: React.FC = () => {
         }
         // Store the result ID if provided
         if (data.resultId) {
+          console.log('✅ Received resultId from backend:', data.resultId);
           setCurrentResultId(data.resultId);
+        } else {
+          console.log('⚠️ No resultId received from backend');
         }
         // Trigger history refresh for authenticated users
         if (user) {
