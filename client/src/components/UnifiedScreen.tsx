@@ -548,9 +548,6 @@ const UnifiedScreen: React.FC = () => {
               {/* Image History */}
               {user && (
                 <div>
-                  <div className="text-xs text-gray-500 mb-2">
-                    Debug: imageHistory.length = {imageHistory.length}
-                  </div>
                   {imageHistory.length > 0 ? (
                     <ImageHistory images={imageHistory} onSelect={handleHistorySelect} />
                   ) : (
