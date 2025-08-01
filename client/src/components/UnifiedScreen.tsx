@@ -89,8 +89,29 @@ const Feedback: React.FC<FeedbackProps> = ({ imageId, result }) => {
   const [showThankYou, setShowThankYou] = useState(false);
 
   const sendFeedback = async (feedbackObj: any) => {
-    // Stub function for future API integration
-    console.log('Sending feedback:', feedbackObj);
+    try {
+      const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+      const response = await fetch(`${apiBase}/feedback`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          calorieResultId: feedbackObj.imageId, // Using imageId as calorieResultId for now
+          imageId: feedbackObj.imageId,
+          feedback: feedbackObj.feedback,
+          rating: feedbackObj.feedback === 'yes' ? 5 : 1
+        }),
+      });
+      
+      if (response.ok) {
+        console.log('✅ Feedback sent successfully');
+      } else {
+        console.error('❌ Failed to send feedback');
+      }
+    } catch (error) {
+      console.error('❌ Error sending feedback:', error);
+    }
   };
 
   console.log('Feedback component - imageId:', imageId, 'current feedback:', feedback);
@@ -281,17 +302,97 @@ const UnifiedScreen: React.FC = () => {
     }
   };
 
+  // Helper function to resize image
+  const resizeImage = (file: File, maxDimension: number = 512): Promise<Blob> => {
+    return new Promise((resolve, reject) => {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      const img = new Image();
+      
+      img.onload = () => {
+        // Calculate new dimensions maintaining aspect ratio
+        let { width, height } = img;
+        if (width > height) {
+          if (width > maxDimension) {
+            height = (height * maxDimension) / width;
+            width = maxDimension;
+          }
+        } else {
+          if (height > maxDimension) {
+            width = (width * maxDimension) / height;
+            height = maxDimension;
+          }
+        }
+        
+        canvas.width = width;
+        canvas.height = height;
+        
+        // Draw resized image
+        ctx?.drawImage(img, 0, 0, width, height);
+        
+        // Convert to blob
+        canvas.toBlob((blob) => {
+          if (blob) {
+            resolve(blob);
+          } else {
+            reject(new Error('Failed to resize image'));
+          }
+        }, 'image/jpeg', 0.8);
+      };
+      
+      img.onerror = () => reject(new Error('Failed to load image'));
+      img.src = URL.createObjectURL(file);
+    });
+  };
+
   const analyzeImage = async () => {
     if (!selectedImage) return;
     setLoading(true);
     setError(null);
     setIsFallback(false);
+    
     try {
-      // Use the original file directly
+      let imageUrl = null;
+      
+      // Step 1: Upload resized image to storage
+      try {
+        const resizedImage = await resizeImage(selectedImage, 512);
+        const uploadFormData = new FormData();
+        uploadFormData.append('image', resizedImage, 'resized.jpg');
+        
+        const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+        const uploadHeaders: Record<string, string> = {};
+        
+        if (user && accessToken) {
+          uploadHeaders.Authorization = `Bearer ${accessToken}`;
+        }
+        
+        const uploadResponse = await fetch(`${apiBase}/upload-image`, {
+          method: 'POST',
+          body: uploadFormData,
+          headers: uploadHeaders,
+        });
+        
+        const uploadData = await uploadResponse.json();
+        
+        if (uploadResponse.ok && uploadData.success) {
+          imageUrl = uploadData.imageUrl;
+          console.log('✅ Image uploaded to storage:', imageUrl);
+        } else {
+          console.warn('⚠️ Failed to upload image to storage, continuing with analysis...');
+        }
+      } catch (uploadError) {
+        console.warn('⚠️ Image upload failed, continuing with analysis:', uploadError);
+      }
+      
+      // Step 2: Analyze original image with optional imageUrl
       const formData = new FormData();
-      formData.append('image', selectedImage);
+      formData.append('image', selectedImage); // Use original image for analysis
       if (user?.id) {
         formData.append('user_id', user.id);
+      }
+      if (imageUrl) {
+        formData.append('imageUrl', imageUrl);
       }
 
       const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:3000';

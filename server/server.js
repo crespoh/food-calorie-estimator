@@ -252,7 +252,7 @@ app.post('/api/analyze', upload.single('image'), async (req, res) => {
     // 5. Save result to Supabase with atomic limit checking using the upload limiter utility
     const insertData = {
       user_id: user?.id || null,
-      image_url: 'inline',
+      image_url: req.body.imageUrl || 'inline', // Use provided imageUrl or fallback
       food_items: parsedResult.foodItems,
       total_calories: parsedResult.totalCalories,
       explanation: parsedResult.explanation,
@@ -322,6 +322,61 @@ app.post('/api/analyze', upload.single('image'), async (req, res) => {
   }
 });
 
+// Route to upload resized image to Supabase Storage
+app.post('/api/upload-image', upload.single('image'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No image file provided' });
+    }
+
+    // Extract user info if authenticated
+    let userId = null;
+    const authHeader = req.headers['authorization'] || req.headers['Authorization'];
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.replace('Bearer ', '');
+      const { data: { user }, error: userError } = await supabase.auth.getUser(token);
+      if (!userError && user) {
+        userId = user.id;
+      }
+    }
+
+    // Generate descriptive filename
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const filename = userId ? `${userId}_${timestamp}.jpg` : `anonymous_${timestamp}.jpg`;
+
+    // Upload to Supabase Storage
+    const { data, error } = await supabase.storage
+      .from('uploads')
+      .upload(filename, req.file.buffer, {
+        contentType: req.file.mimetype,
+        cacheControl: '3600',
+        upsert: false
+      });
+
+    if (error) {
+      console.error('Storage upload error:', error);
+      return res.status(500).json({ error: 'Failed to upload image to storage' });
+    }
+
+    // Get public URL
+    const { data: urlData } = supabase.storage
+      .from('uploads')
+      .getPublicUrl(filename);
+
+    console.log('✅ Image uploaded successfully:', filename);
+    
+    res.json({
+      success: true,
+      imageUrl: urlData.publicUrl,
+      filename: filename
+    });
+
+  } catch (error) {
+    console.error('Upload image error:', error);
+    res.status(500).json({ error: 'Failed to upload image', details: error.message });
+  }
+});
+
 // Route to get current daily usage for the authenticated user
 app.get('/api/user-usage', async (req, res) => {
   try {
@@ -348,6 +403,50 @@ app.get('/api/user-usage', async (req, res) => {
     res.json({ success: true, usage });
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch user usage', details: err.message });
+  }
+});
+
+// Route to submit feedback
+app.post('/api/feedback', async (req, res) => {
+  try {
+    const { calorieResultId, imageId, feedback, rating } = req.body;
+    
+    if (!calorieResultId || !feedback) {
+      return res.status(400).json({ error: 'Missing required fields: calorieResultId and feedback' });
+    }
+
+    // Extract user info if authenticated
+    let userId = null;
+    const authHeader = req.headers['authorization'] || req.headers['Authorization'];
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.replace('Bearer ', '');
+      const { data: { user }, error: userError } = await supabase.auth.getUser(token);
+      if (!userError && user) {
+        userId = user.id;
+      }
+    }
+
+    // Insert feedback into feedback table
+    const { data, error } = await supabase.from('feedback').insert([{
+      calorie_result_id: calorieResultId,
+      image_id: imageId,
+      user_id: userId,
+      feedback: feedback,
+      rating: rating || null,
+      created_at: new Date().toISOString()
+    }]);
+
+    if (error) {
+      console.error('Feedback insert error:', error);
+      return res.status(500).json({ error: 'Failed to save feedback' });
+    }
+
+    console.log('✅ Feedback saved successfully');
+    res.json({ success: true, data });
+
+  } catch (error) {
+    console.error('Feedback error:', error);
+    res.status(500).json({ error: 'Failed to submit feedback', details: error.message });
   }
 });
 
