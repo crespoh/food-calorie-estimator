@@ -495,14 +495,30 @@ app.get('/api/feedback/:calorieResultId', async (req, res) => {
       }
     }
 
+    console.log('🔍 Fetching feedback for calorieResultId:', calorieResultId, 'userId:', userId);
+    
     // Query feedback for this calorie result
-    const { data, error } = await supabase
+    // If user is authenticated, look for their feedback
+    // If not authenticated, look for anonymous feedback (user_id = null)
+    let query = supabase
       .from('feedback')
       .select('*')
       .eq('calorie_result_id', calorieResultId)
-      .eq('user_id', userId)
       .order('created_at', { ascending: false })
       .limit(1);
+    
+    if (userId) {
+      // Authenticated user - look for their specific feedback
+      query = query.eq('user_id', userId);
+      console.log('🔍 Looking for authenticated user feedback');
+    } else {
+      // Anonymous user - look for anonymous feedback
+      query = query.is('user_id', null);
+      console.log('🔍 Looking for anonymous feedback');
+    }
+    
+    const { data, error } = await query;
+    console.log('📥 Feedback query result:', { data, error });
 
     if (error) {
       console.error('Feedback fetch error:', error);

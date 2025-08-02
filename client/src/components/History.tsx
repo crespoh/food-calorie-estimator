@@ -59,9 +59,12 @@ const HistoryFeedback: React.FC<{
   calorieResultId: string; 
   imageId: string; 
   onFeedbackSubmitted: () => void;
-}> = ({ calorieResultId, imageId, onFeedbackSubmitted }) => {
+  existingFeedback?: Feedback | null;
+}> = ({ calorieResultId, imageId, onFeedbackSubmitted, existingFeedback }) => {
   const { user } = useAuth();
-  const [feedback, setFeedback] = useState<'yes' | 'no' | null>(null);
+  const [feedback, setFeedback] = useState<'yes' | 'no' | null>(
+    existingFeedback ? (existingFeedback.feedback as 'yes' | 'no') : null
+  );
   const [showThankYou, setShowThankYou] = useState(false);
   const [loading, setLoading] = useState(false);
 
@@ -110,10 +113,31 @@ const HistoryFeedback: React.FC<{
     );
   }
 
-  if (feedback !== null) {
+  // If feedback was just submitted, show thank you message
+  if (feedback !== null && !existingFeedback) {
     return (
-      <div className="mt-3 p-2 bg-gray-50 border border-gray-200 rounded text-gray-600 text-xs text-center">
-        Feedback submitted
+      <div className="mt-3 p-2 bg-blue-50 border border-blue-200 rounded text-xs">
+        <div className="flex items-center gap-2">
+          <span className={`font-medium ${feedback === 'yes' ? 'text-green-600' : 'text-red-600'}`}>
+            {feedback === 'yes' ? '👍 Accurate' : '👎 Inaccurate'}
+          </span>
+        </div>
+      </div>
+    );
+  }
+
+  // If feedback already exists, don't show the submission buttons
+  if (existingFeedback) {
+    return (
+      <div className="mt-3 p-2 bg-blue-50 border border-blue-200 rounded text-xs">
+        <div className="flex items-center gap-2">
+          <span className={`font-medium ${existingFeedback.feedback === 'yes' ? 'text-green-600' : 'text-red-600'}`}>
+            {existingFeedback.feedback === 'yes' ? '👍 Accurate' : '👎 Inaccurate'}
+          </span>
+          <span className="text-gray-500">
+            • {new Date(existingFeedback.created_at).toLocaleString()}
+          </span>
+        </div>
       </div>
     );
   }
@@ -191,6 +215,17 @@ const History: React.FC<HistoryProps> = ({ refreshTrigger }) => {
     fetchHistory();
   }, [user, apiBase, refreshTrigger]);
 
+  // Fetch feedback for expanded items when they change
+  useEffect(() => {
+    if (isHistoryExpanded && expandedItems.size > 0) {
+      expandedItems.forEach(itemId => {
+        if (!feedbackData[itemId]) {
+          fetchFeedbackForResult(itemId);
+        }
+      });
+    }
+  }, [expandedItems, isHistoryExpanded]);
+
   const toggleHistoryExpanded = () => {
     setIsHistoryExpanded(!isHistoryExpanded);
   };
@@ -223,6 +258,7 @@ const History: React.FC<HistoryProps> = ({ refreshTrigger }) => {
       const accessToken = session?.access_token;
       if (!accessToken) return;
 
+      console.log('🔍 Fetching feedback for result:', calorieResultId);
       const res = await fetch(`${apiBase}/feedback/${calorieResultId}`, {
         headers: {
           Authorization: `Bearer ${accessToken}`,
@@ -230,14 +266,19 @@ const History: React.FC<HistoryProps> = ({ refreshTrigger }) => {
       });
       
       const json = await res.json();
-      if (json.success && json.feedback) {
+      console.log('📥 Feedback response:', json);
+      
+      if (json.success) {
         setFeedbackData(prev => ({
           ...prev,
-          [calorieResultId]: json.feedback
+          [calorieResultId]: json.feedback || null
         }));
+        console.log('✅ Feedback data updated for:', calorieResultId, json.feedback);
+      } else {
+        console.log('❌ Failed to fetch feedback:', json.error);
       }
     } catch (error) {
-      console.error('Failed to fetch feedback:', error);
+      console.error('❌ Failed to fetch feedback:', error);
     }
   };
 
@@ -397,24 +438,12 @@ const History: React.FC<HistoryProps> = ({ refreshTrigger }) => {
                         {/* Feedback Section */}
                         <div>
                           <span className="font-semibold text-gray-700 text-sm">Feedback:</span>
-                          {feedbackData[res.id] ? (
-                            <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded text-xs">
-                              <div className="flex items-center gap-2">
-                                <span className={`font-medium ${feedbackData[res.id].feedback === 'yes' ? 'text-green-600' : 'text-red-600'}`}>
-                                  {feedbackData[res.id].feedback === 'yes' ? '👍 Accurate' : '👎 Inaccurate'}
-                                </span>
-                                <span className="text-gray-500">
-                                  • {new Date(feedbackData[res.id].created_at).toLocaleString()}
-                                </span>
-                              </div>
-                            </div>
-                          ) : (
-                            <HistoryFeedback 
-                              calorieResultId={res.id}
-                              imageId={`img_${Math.abs(res.id.split('-')[0].charCodeAt(0))}`}
-                              onFeedbackSubmitted={() => handleFeedbackSubmitted(res.id)}
-                            />
-                          )}
+                          <HistoryFeedback 
+                            calorieResultId={res.id}
+                            imageId={`img_${Math.abs(res.id.split('-')[0].charCodeAt(0))}`}
+                            onFeedbackSubmitted={() => handleFeedbackSubmitted(res.id)}
+                            existingFeedback={feedbackData[res.id] || null}
+                          />
                         </div>
                       </div>
                     </div>
