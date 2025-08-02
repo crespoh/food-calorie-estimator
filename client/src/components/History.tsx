@@ -20,6 +20,16 @@ interface CalorieResult {
   image_url?: string;
 }
 
+interface Feedback {
+  id: string;
+  calorie_result_id: string;
+  image_id: string;
+  user_id: string;
+  feedback: string;
+  rating: number;
+  created_at: string;
+}
+
 const NutritionTable: React.FC<{ facts?: CalorieResult['nutrition_table'] }> = ({ facts }) => {
   if (!facts) return null;
   const keys = Object.keys(facts);
@@ -44,6 +54,93 @@ const NutritionTable: React.FC<{ facts?: CalorieResult['nutrition_table'] }> = (
   );
 };
 
+// Feedback component for history items
+const HistoryFeedback: React.FC<{ 
+  calorieResultId: string; 
+  imageId: string; 
+  onFeedbackSubmitted: () => void;
+}> = ({ calorieResultId, imageId, onFeedbackSubmitted }) => {
+  const { user } = useAuth();
+  const [feedback, setFeedback] = useState<'yes' | 'no' | null>(null);
+  const [showThankYou, setShowThankYou] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  const sendFeedback = async (feedbackValue: 'yes' | 'no') => {
+    setLoading(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const accessToken = session?.access_token;
+      
+      const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+      const response = await fetch(`${apiBase}/feedback`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(accessToken && { Authorization: `Bearer ${accessToken}` }),
+        },
+        body: JSON.stringify({
+          calorieResultId,
+          imageId,
+          feedback: feedbackValue,
+          rating: feedbackValue === 'yes' ? 5 : 1
+        }),
+      });
+      
+      if (response.ok) {
+        console.log('✅ Feedback sent successfully');
+        setFeedback(feedbackValue);
+        setShowThankYou(true);
+        onFeedbackSubmitted();
+        setTimeout(() => setShowThankYou(false), 3000);
+      } else {
+        console.error('❌ Failed to send feedback');
+      }
+    } catch (error) {
+      console.error('❌ Error sending feedback:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (showThankYou) {
+    return (
+      <div className="mt-3 p-2 bg-green-50 border border-green-200 rounded text-green-800 text-xs text-center">
+        Thank you for your feedback!
+      </div>
+    );
+  }
+
+  if (feedback !== null) {
+    return (
+      <div className="mt-3 p-2 bg-gray-50 border border-gray-200 rounded text-gray-600 text-xs text-center">
+        Feedback submitted
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-3">
+      <p className="text-xs text-gray-600 mb-2">Was this accurate?</p>
+      <div className="flex gap-2">
+        <button
+          onClick={() => sendFeedback('yes')}
+          disabled={loading}
+          className="flex-1 bg-green-100 text-green-700 py-1 px-2 rounded text-xs font-medium hover:bg-green-200 transition-colors disabled:opacity-50"
+        >
+          👍 Yes
+        </button>
+        <button
+          onClick={() => sendFeedback('no')}
+          disabled={loading}
+          className="flex-1 bg-red-100 text-red-700 py-1 px-2 rounded text-xs font-medium hover:bg-red-200 transition-colors disabled:opacity-50"
+        >
+          👎 No
+        </button>
+      </div>
+    </div>
+  );
+};
+
 interface HistoryProps {
   refreshTrigger?: number;
 }
@@ -55,6 +152,7 @@ const History: React.FC<HistoryProps> = ({ refreshTrigger }) => {
   const [error, setError] = useState<string | null>(null);
   const [isHistoryExpanded, setIsHistoryExpanded] = useState(false);
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
+  const [feedbackData, setFeedbackData] = useState<Record<string, Feedback>>({});
   const apiBase = import.meta.env.VITE_API_URL;
 
   useEffect(() => {
@@ -103,6 +201,8 @@ const History: React.FC<HistoryProps> = ({ refreshTrigger }) => {
       newExpandedItems.delete(itemId);
     } else {
       newExpandedItems.add(itemId);
+      // Fetch feedback when expanding an item
+      fetchFeedbackForResult(itemId);
     }
     setExpandedItems(newExpandedItems);
   };
@@ -115,6 +215,35 @@ const History: React.FC<HistoryProps> = ({ refreshTrigger }) => {
       // Some or no items are expanded, expand all
       setExpandedItems(new Set(results.map(r => r.id)));
     }
+  };
+
+  const fetchFeedbackForResult = async (calorieResultId: string) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const accessToken = session?.access_token;
+      if (!accessToken) return;
+
+      const res = await fetch(`${apiBase}/feedback/${calorieResultId}`, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+      
+      const json = await res.json();
+      if (json.success && json.feedback) {
+        setFeedbackData(prev => ({
+          ...prev,
+          [calorieResultId]: json.feedback
+        }));
+      }
+    } catch (error) {
+      console.error('Failed to fetch feedback:', error);
+    }
+  };
+
+  const handleFeedbackSubmitted = (calorieResultId: string) => {
+    // Refresh feedback data for this result
+    fetchFeedbackForResult(calorieResultId);
   };
 
   if (!user) return null;
@@ -192,6 +321,15 @@ const History: React.FC<HistoryProps> = ({ refreshTrigger }) => {
                           <span className="bg-blue-100 text-blue-700 text-xs px-2 py-1 rounded-full font-medium">
                             {res.total_calories ?? '-'} cal
                           </span>
+                          {feedbackData[res.id] && (
+                            <span className={`text-xs px-2 py-1 rounded-full font-medium ${
+                              feedbackData[res.id].feedback === 'yes' 
+                                ? 'bg-green-100 text-green-700' 
+                                : 'bg-red-100 text-red-700'
+                            }`}>
+                              {feedbackData[res.id].feedback === 'yes' ? '👍' : '👎'}
+                            </span>
+                          )}
                         </div>
                         <div className="text-sm text-gray-700">
                           <span className="font-medium">Items: </span>
@@ -254,6 +392,29 @@ const History: React.FC<HistoryProps> = ({ refreshTrigger }) => {
                           <div className="mt-1 text-xs text-gray-600 bg-white p-3 rounded border leading-relaxed">
                             {res.explanation}
                           </div>
+                        </div>
+
+                        {/* Feedback Section */}
+                        <div>
+                          <span className="font-semibold text-gray-700 text-sm">Feedback:</span>
+                          {feedbackData[res.id] ? (
+                            <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded text-xs">
+                              <div className="flex items-center gap-2">
+                                <span className={`font-medium ${feedbackData[res.id].feedback === 'yes' ? 'text-green-600' : 'text-red-600'}`}>
+                                  {feedbackData[res.id].feedback === 'yes' ? '👍 Accurate' : '👎 Inaccurate'}
+                                </span>
+                                <span className="text-gray-500">
+                                  • {new Date(feedbackData[res.id].created_at).toLocaleString()}
+                                </span>
+                              </div>
+                            </div>
+                          ) : (
+                            <HistoryFeedback 
+                              calorieResultId={res.id}
+                              imageId={`img_${Math.abs(res.id.split('-')[0].charCodeAt(0))}`}
+                              onFeedbackSubmitted={() => handleFeedbackSubmitted(res.id)}
+                            />
+                          )}
                         </div>
                       </div>
                     </div>

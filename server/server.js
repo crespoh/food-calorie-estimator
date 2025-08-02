@@ -479,6 +479,43 @@ app.post('/api/feedback', async (req, res) => {
   }
 });
 
+// Route to fetch feedback for a specific calorie result
+app.get('/api/feedback/:calorieResultId', async (req, res) => {
+  try {
+    const { calorieResultId } = req.params;
+    
+    // Extract user info if authenticated
+    let userId = null;
+    const authHeader = req.headers['authorization'] || req.headers['Authorization'];
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.replace('Bearer ', '');
+      const { data: { user }, error: userError } = await supabase.auth.getUser(token);
+      if (!userError && user) {
+        userId = user.id;
+      }
+    }
+
+    // Query feedback for this calorie result
+    const { data, error } = await supabase
+      .from('feedback')
+      .select('*')
+      .eq('calorie_result_id', calorieResultId)
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(1);
+
+    if (error) {
+      console.error('Feedback fetch error:', error);
+      return res.status(500).json({ error: 'Failed to fetch feedback' });
+    }
+
+    res.json({ success: true, feedback: data[0] || null });
+  } catch (error) {
+    console.error('Feedback fetch error:', error);
+    res.status(500).json({ error: 'Failed to fetch feedback', details: error.message });
+  }
+});
+
 // Route to fetch calorie results for the authenticated user
 app.get('/api/user-history', async (req, res) => {
   try {
