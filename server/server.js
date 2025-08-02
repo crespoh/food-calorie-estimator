@@ -418,6 +418,62 @@ app.get('/api/user-usage', async (req, res) => {
   }
 });
 
+// Route to log share events
+app.post('/api/share-event', async (req, res) => {
+  try {
+    console.log('📤 Share event received:', req.body);
+    const { platform, resultId, userAgent, timestamp } = req.body;
+    
+    if (!platform) {
+      console.log('❌ Missing platform field');
+      return res.status(400).json({ error: 'Missing required field: platform' });
+    }
+
+    // Extract user info if authenticated
+    let userId = null;
+    const authHeader = req.headers['authorization'] || req.headers['Authorization'];
+    console.log('🔐 Auth header:', authHeader ? 'Present' : 'Missing');
+    
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.replace('Bearer ', '');
+      const { data: { user }, error: userError } = await supabase.auth.getUser(token);
+      if (!userError && user) {
+        userId = user.id;
+        console.log('✅ Authenticated user:', userId);
+      } else {
+        console.log('❌ Auth error:', userError);
+      }
+    } else {
+      console.log('👤 Anonymous user');
+    }
+
+    // Insert share event into share_events table
+    const shareEventData = {
+      user_id: userId,
+      platform: platform,
+      result_id: resultId || null,
+      user_agent: userAgent || null,
+      created_at: timestamp || new Date().toISOString()
+    };
+    
+    console.log('💾 Inserting share event data:', shareEventData);
+    
+    const { data, error } = await supabase.from('share_events').insert([shareEventData]);
+
+    if (error) {
+      console.error('Share event insert error:', error);
+      return res.status(500).json({ error: 'Failed to log share event' });
+    }
+
+    console.log('✅ Share event logged successfully');
+    res.json({ success: true, data });
+
+  } catch (error) {
+    console.error('Share event error:', error);
+    res.status(500).json({ error: 'Failed to log share event', details: error.message });
+  }
+});
+
 // Route to submit feedback
 app.post('/api/feedback', async (req, res) => {
   try {
@@ -529,6 +585,61 @@ app.get('/api/feedback/:calorieResultId', async (req, res) => {
   } catch (error) {
     console.error('Feedback fetch error:', error);
     res.status(500).json({ error: 'Failed to fetch feedback', details: error.message });
+  }
+});
+
+// Route to fetch share analytics (admin only)
+app.get('/api/share-analytics', async (req, res) => {
+  try {
+    const authHeader = req.headers['authorization'] || req.headers['Authorization'];
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'Missing or invalid Authorization header' });
+    }
+    const token = authHeader.replace('Bearer ', '');
+
+    // Validate JWT and get user info from Supabase
+    const { data: { user }, error: userError } = await supabase.auth.getUser(token);
+    if (userError || !user) {
+      return res.status(401).json({ error: 'Invalid or expired token' });
+    }
+
+    // TODO: Add admin check here if needed
+    // For now, allow any authenticated user to view analytics
+
+    // Get share analytics
+    const { data: platformStats, error: platformError } = await supabase
+      .from('share_events')
+      .select('platform, count(*)')
+      .group('platform');
+
+    if (platformError) {
+      return res.status(500).json({ error: platformError.message });
+    }
+
+    // Get recent share events
+    const { data: recentShares, error: recentError } = await supabase
+      .from('share_events')
+      .select(`
+        *,
+        calorie_results(food_items, total_calories)
+      `)
+      .order('created_at', { ascending: false })
+      .limit(10);
+
+    if (recentError) {
+      return res.status(500).json({ error: recentError.message });
+    }
+
+    res.json({ 
+      success: true, 
+      analytics: {
+        platformStats,
+        recentShares,
+        totalShares: recentShares.length
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch share analytics', details: err.message });
   }
 });
 

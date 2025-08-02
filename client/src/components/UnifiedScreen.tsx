@@ -5,6 +5,7 @@ import { useAuth } from '../AuthContext';
 import { supabase } from '../supabaseClient';
 import AuthForm from './AuthForm';
 import History from './History';
+import ShareButton from './ShareButton';
 
 interface AnalysisResult {
   foodItems: string[];
@@ -812,7 +813,7 @@ const UnifiedScreen: React.FC = () => {
                   <p className="text-gray-700 leading-relaxed">{result.explanation}</p>
                 </div>
 
-                {/* Download / Copy Buttons */}
+                {/* Download / Copy / Share Buttons */}
                 <div className="flex flex-col sm:flex-row gap-3 mt-2 mb-4">
                   <button
                     onClick={handleDownloadResult}
@@ -826,6 +827,7 @@ const UnifiedScreen: React.FC = () => {
                   >
                     📋 {copySuccess ? copySuccess : 'Copy Result'}
                   </button>
+                  <ShareButton result={result} resultId={currentResultId || undefined} />
                 </div>
 
                 {/* Feedback Section */}
