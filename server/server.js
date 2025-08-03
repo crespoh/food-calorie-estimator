@@ -701,6 +701,110 @@ app.patch('/api/result/:resultId/public', async (req, res) => {
   }
 });
 
+// Route to track analytics events
+app.post('/api/analytics/event', async (req, res) => {
+  try {
+    const { event, resultId, timestamp, userAgent, referrer, path } = req.body;
+    
+    console.log('📊 Analytics event:', event, resultId);
+    
+    // Insert analytics event into database
+    const { error } = await supabase
+      .from('analytics_events')
+      .insert([{
+        event_type: event,
+        result_id: resultId || null,
+        timestamp: timestamp || new Date().toISOString(),
+        user_agent: userAgent,
+        referrer: referrer || null,
+        path: path,
+        ip_address: req.headers['x-forwarded-for']?.toString().split(',')[0] || req.connection.remoteAddress,
+      }]);
+    
+    if (error) {
+      console.error('❌ Analytics insert error:', error);
+      return res.status(500).json({ error: 'Failed to track event' });
+    }
+    
+    res.json({ success: true });
+    
+  } catch (error) {
+    console.error('❌ Analytics error:', error);
+    res.status(500).json({ error: 'Failed to track analytics event' });
+  }
+});
+
+// Route to fetch public result analytics (admin only)
+app.get('/api/public-analytics', async (req, res) => {
+  try {
+    // Check if user is authenticated and has admin role (you can customize this)
+    const authHeader = req.headers['authorization'] || req.headers['Authorization'];
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    // Get analytics data for the last 30 days
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    // Get public result views
+    const { data: viewEvents, error: viewError } = await supabase
+      .from('analytics_events')
+      .select('*')
+      .eq('event_type', 'public_result_view')
+      .gte('timestamp', thirtyDaysAgo.toISOString());
+
+    // Get public result shares
+    const { data: shareEvents, error: shareError } = await supabase
+      .from('analytics_events')
+      .select('*')
+      .eq('event_type', 'public_result_share')
+      .gte('timestamp', thirtyDaysAgo.toISOString());
+
+    // Get CTA clicks
+    const { data: ctaEvents, error: ctaError } = await supabase
+      .from('analytics_events')
+      .select('*')
+      .eq('event_type', 'public_result_cta_click')
+      .gte('timestamp', thirtyDaysAgo.toISOString());
+
+    if (viewError || shareError || ctaError) {
+      console.error('❌ Analytics fetch error:', { viewError, shareError, ctaError });
+      return res.status(500).json({ error: 'Failed to fetch analytics' });
+    }
+
+    // Get top shared results
+    const { data: topResults, error: topResultsError } = await supabase
+      .from('analytics_events')
+      .select('result_id, count')
+      .eq('event_type', 'public_result_view')
+      .gte('timestamp', thirtyDaysAgo.toISOString())
+      .not('result_id', 'is', null)
+      .select(`
+        result_id,
+        count(*)
+      `)
+      .group('result_id')
+      .order('count', { ascending: false })
+      .limit(10);
+
+    const analytics = {
+      period: 'Last 30 days',
+      views: viewEvents?.length || 0,
+      shares: shareEvents?.length || 0,
+      ctaClicks: ctaEvents?.length || 0,
+      conversionRate: viewEvents?.length ? ((ctaEvents?.length || 0) / viewEvents.length * 100).toFixed(1) : '0',
+      topResults: topResults || [],
+    };
+
+    res.json({ success: true, analytics });
+    
+  } catch (error) {
+    console.error('❌ Public analytics error:', error);
+    res.status(500).json({ error: 'Failed to fetch public analytics' });
+  }
+});
+
 // Route to fetch share analytics (admin only)
 app.get('/api/share-analytics', async (req, res) => {
   try {

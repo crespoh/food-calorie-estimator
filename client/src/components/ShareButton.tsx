@@ -25,6 +25,7 @@ const ShareButton: React.FC<ShareButtonProps> = ({ result, resultId }) => {
   const [copied, setCopied] = useState(false);
   const [isPublic, setIsPublic] = useState(false);
   const [updatingPublic, setUpdatingPublic] = useState(false);
+  const [showPublicStatus, setShowPublicStatus] = useState(false);
   const { user } = useAuth();
 
   // Construct share text
@@ -116,8 +117,8 @@ const ShareButton: React.FC<ShareButtonProps> = ({ result, resultId }) => {
     setIsOpen(false);
   };
 
-  // Handle making result public
-  const handleMakePublic = async () => {
+  // Handle making result public/private
+  const handleTogglePublic = async () => {
     if (!resultId || !user) return;
     
     setUpdatingPublic(true);
@@ -132,17 +133,19 @@ const ShareButton: React.FC<ShareButtonProps> = ({ result, resultId }) => {
           'Content-Type': 'application/json',
           ...(accessToken && { Authorization: `Bearer ${accessToken}` }),
         },
-        body: JSON.stringify({ isPublic: true }),
+        body: JSON.stringify({ isPublic: !isPublic }),
       });
       
       if (response.ok) {
-        setIsPublic(true);
-        console.log('✅ Result made public successfully');
+        setIsPublic(!isPublic);
+        setShowPublicStatus(true);
+        setTimeout(() => setShowPublicStatus(false), 3000);
+        console.log(`✅ Result ${!isPublic ? 'made public' : 'made private'} successfully`);
       } else {
-        console.error('❌ Failed to make result public');
+        console.error('❌ Failed to update result visibility');
       }
     } catch (error) {
-      console.error('❌ Error making result public:', error);
+      console.error('❌ Error updating result visibility:', error);
     } finally {
       setUpdatingPublic(false);
     }
@@ -233,24 +236,29 @@ const ShareButton: React.FC<ShareButtonProps> = ({ result, resultId }) => {
             {resultId && user && (
               <div className="border-t border-gray-100 pt-2 mt-2">
                 <button
-                  onClick={handleMakePublic}
-                  disabled={updatingPublic || isPublic}
+                  onClick={handleTogglePublic}
+                  disabled={updatingPublic}
                   className="w-full px-4 py-2 text-left hover:bg-gray-50 flex items-center gap-3 text-sm disabled:opacity-50"
                 >
-                  <div className="w-4 h-4 bg-green-500 rounded-sm flex items-center justify-center">
-                    <span className="text-white text-xs font-bold">P</span>
+                  <div className={`w-4 h-4 rounded-sm flex items-center justify-center ${isPublic ? 'bg-red-500' : 'bg-green-500'}`}>
+                    <span className="text-white text-xs font-bold">{isPublic ? 'P' : 'P'}</span>
                   </div>
                   {updatingPublic ? (
-                    'Making Public...'
+                    `${isPublic ? 'Making Private...' : 'Making Public...'}`
                   ) : isPublic ? (
                     <>
                       <Check className="w-4 h-4 text-green-600" />
-                      Public Link Ready
+                      Make Private
                     </>
                   ) : (
                     'Make Public Link'
                   )}
                 </button>
+                {showPublicStatus && (
+                  <div className="px-4 py-2 mt-2 text-xs bg-green-50 border border-green-200 rounded text-green-700">
+                    {isPublic ? '✅ Result is now public and shareable!' : '🔒 Result is now private'}
+                  </div>
+                )}
               </div>
             )}
           </div>

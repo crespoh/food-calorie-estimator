@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Loader2, AlertCircle, Utensils, ArrowLeft, ExternalLink } from 'lucide-react';
+import { trackPublicResultView, trackPublicResultShare, trackPublicResultCTA } from '../utils/analytics';
 
 interface PublicResultData {
   id: string;
@@ -76,6 +77,8 @@ const PublicResult: React.FC = () => {
 
         if (data.success && data.result) {
           setResult(data.result);
+          // Track the public result view
+          trackPublicResultView(resultId);
         } else {
           throw new Error('Invalid response format');
         }
@@ -226,14 +229,37 @@ const PublicResult: React.FC = () => {
             <p className="text-emerald-700 mb-4">
               Upload a photo of your meal and get instant calorie and nutrition analysis powered by AI.
             </p>
-            <Link
-              to="/"
-              className="inline-flex items-center gap-2 bg-emerald-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-emerald-700 transition-colors"
-            >
-              <Utensils className="w-4 h-4" />
-              Try It Yourself
-            </Link>
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              <Link
+                to="/"
+                onClick={() => trackPublicResultCTA(result.id)}
+                className="inline-flex items-center gap-2 bg-emerald-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-emerald-700 transition-colors"
+              >
+                <Utensils className="w-4 h-4" />
+                Try It Yourself
+              </Link>
+              <button
+                onClick={() => {
+                  const shareText = `🍽️ Check out this food analysis! Found ${result.food_items?.join(', ') || 'delicious food'} - ${result.total_calories} calories total. Try analyzing your own food at ${window.location.origin}`;
+                  navigator.clipboard.writeText(shareText);
+                  trackPublicResultShare(result.id);
+                  alert('Share text copied to clipboard!');
+                }}
+                className="inline-flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-blue-700 transition-colors"
+              >
+                <ExternalLink className="w-4 h-4" />
+                Share This Result
+              </button>
+            </div>
           </div>
+        </div>
+
+        {/* Additional Info */}
+        <div className="mt-8 text-center text-sm text-gray-500">
+          <p>
+            This analysis was performed using AI-powered image recognition technology. 
+            Results are estimates and should not replace professional nutritional advice.
+          </p>
         </div>
       </div>
     </div>
