@@ -588,6 +588,119 @@ app.get('/api/feedback/:calorieResultId', async (req, res) => {
   }
 });
 
+// Route to fetch public calorie result by ID
+app.get('/api/public-result/:resultId', async (req, res) => {
+  try {
+    const { resultId } = req.params;
+    
+    console.log('🔍 Fetching public result:', resultId);
+    
+    // Validate resultId format (should be a valid UUID)
+    if (!resultId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(resultId)) {
+      return res.status(400).json({ error: 'Invalid result ID format' });
+    }
+    
+    // Fetch public result from database
+    const { data, error } = await supabase
+      .from('calorie_results')
+      .select(`
+        id,
+        created_at,
+        food_items,
+        total_calories,
+        explanation,
+        nutrition_table,
+        serving_size,
+        confidence_score,
+        image_url
+      `)
+      .eq('id', resultId)
+      .eq('is_public', true)
+      .single();
+    
+    if (error) {
+      console.error('❌ Database error fetching public result:', error);
+      return res.status(500).json({ error: 'Failed to fetch result' });
+    }
+    
+    if (!data) {
+      console.log('❌ Public result not found:', resultId);
+      return res.status(404).json({ error: 'Result not found or not public' });
+    }
+    
+    console.log('✅ Public result fetched successfully:', resultId);
+    
+    // Return the public result data
+    res.json({ 
+      success: true, 
+      result: data 
+    });
+    
+  } catch (error) {
+    console.error('❌ Error fetching public result:', error);
+    res.status(500).json({ error: 'Failed to fetch public result', details: error.message });
+  }
+});
+
+// Route to update result public status
+app.patch('/api/result/:resultId/public', async (req, res) => {
+  try {
+    const { resultId } = req.params;
+    const { isPublic } = req.body;
+    
+    console.log('🔧 Updating result public status:', resultId, 'isPublic:', isPublic);
+    
+    // Validate resultId format
+    if (!resultId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(resultId)) {
+      return res.status(400).json({ error: 'Invalid result ID format' });
+    }
+    
+    // Extract user info if authenticated
+    let userId = null;
+    const authHeader = req.headers['authorization'] || req.headers['Authorization'];
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.replace('Bearer ', '');
+      const { data: { user }, error: userError } = await supabase.auth.getUser(token);
+      if (!userError && user) {
+        userId = user.id;
+      }
+    }
+    
+    if (!userId) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+    
+    // Update the result's public status
+    const { data, error } = await supabase
+      .from('calorie_results')
+      .update({ is_public: isPublic })
+      .eq('id', resultId)
+      .eq('user_id', userId)
+      .select()
+      .single();
+    
+    if (error) {
+      console.error('❌ Database error updating result:', error);
+      return res.status(500).json({ error: 'Failed to update result' });
+    }
+    
+    if (!data) {
+      return res.status(404).json({ error: 'Result not found or not owned by user' });
+    }
+    
+    console.log('✅ Result public status updated successfully:', resultId, 'isPublic:', isPublic);
+    
+    res.json({ 
+      success: true, 
+      result: data 
+    });
+    
+  } catch (error) {
+    console.error('❌ Error updating result public status:', error);
+    res.status(500).json({ error: 'Failed to update result', details: error.message });
+  }
+});
+
 // Route to fetch share analytics (admin only)
 app.get('/api/share-analytics', async (req, res) => {
   try {

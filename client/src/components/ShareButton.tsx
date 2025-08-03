@@ -23,14 +23,16 @@ interface ShareButtonProps {
 const ShareButton: React.FC<ShareButtonProps> = ({ result, resultId }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [isPublic, setIsPublic] = useState(false);
+  const [updatingPublic, setUpdatingPublic] = useState(false);
   const { user } = useAuth();
 
   // Construct share text
   const foodItemsText = result.foodItems.join(', ');
   const shareText = `🍽️ Just analyzed my food with AI! Found ${foodItemsText} - ${result.totalCalories} calories total. Check out this amazing food calorie estimator!`;
   
-  // Create shareable link (for future public result viewing)
-  const shareableLink = resultId 
+  // Create shareable link (for public result viewing)
+  const shareableLink = resultId && isPublic
     ? `${window.location.origin}/result/${resultId}`
     : window.location.origin;
 
@@ -114,6 +116,38 @@ const ShareButton: React.FC<ShareButtonProps> = ({ result, resultId }) => {
     setIsOpen(false);
   };
 
+  // Handle making result public
+  const handleMakePublic = async () => {
+    if (!resultId || !user) return;
+    
+    setUpdatingPublic(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const accessToken = session?.access_token;
+      
+      const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+      const response = await fetch(`${apiBase}/result/${resultId}/public`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(accessToken && { Authorization: `Bearer ${accessToken}` }),
+        },
+        body: JSON.stringify({ isPublic: true }),
+      });
+      
+      if (response.ok) {
+        setIsPublic(true);
+        console.log('✅ Result made public successfully');
+      } else {
+        console.error('❌ Failed to make result public');
+      }
+    } catch (error) {
+      console.error('❌ Error making result public:', error);
+    } finally {
+      setUpdatingPublic(false);
+    }
+  };
+
   return (
     <div className="relative">
       <button
@@ -140,7 +174,7 @@ const ShareButton: React.FC<ShareButtonProps> = ({ result, resultId }) => {
               className="w-full px-4 py-2 text-left hover:bg-gray-50 flex items-center gap-3 text-sm"
             >
               <Share2 className="w-4 h-4 text-blue-600" />
-              {navigator.share ? 'Share...' : 'Copy Link'}
+              {typeof navigator.share === 'function' ? 'Share...' : 'Copy Link'}
             </button>
 
             {/* Twitter */}
@@ -194,6 +228,31 @@ const ShareButton: React.FC<ShareButtonProps> = ({ result, resultId }) => {
                 'Copy Link'
               )}
             </button>
+
+            {/* Make Public Toggle */}
+            {resultId && user && (
+              <div className="border-t border-gray-100 pt-2 mt-2">
+                <button
+                  onClick={handleMakePublic}
+                  disabled={updatingPublic || isPublic}
+                  className="w-full px-4 py-2 text-left hover:bg-gray-50 flex items-center gap-3 text-sm disabled:opacity-50"
+                >
+                  <div className="w-4 h-4 bg-green-500 rounded-sm flex items-center justify-center">
+                    <span className="text-white text-xs font-bold">P</span>
+                  </div>
+                  {updatingPublic ? (
+                    'Making Public...'
+                  ) : isPublic ? (
+                    <>
+                      <Check className="w-4 h-4 text-green-600" />
+                      Public Link Ready
+                    </>
+                  ) : (
+                    'Make Public Link'
+                  )}
+                </button>
+              </div>
+            )}
           </div>
         </>
       )}
