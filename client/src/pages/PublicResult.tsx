@@ -169,6 +169,28 @@ const PublicResult: React.FC = () => {
             Analyzed on {new Date(result.created_at).toLocaleDateString()} at {new Date(result.created_at).toLocaleTimeString()}
           </div>
 
+          {/* Food Image */}
+          {result.image_url && result.image_url !== 'inline' && (
+            <div className="mb-6">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-2xl">📸</span>
+                <h2 className="text-xl font-semibold text-gray-800">Analyzed Food Image</h2>
+              </div>
+              <div className="relative">
+                <img 
+                  src={result.image_url} 
+                  alt="Analyzed food" 
+                  className="w-full max-w-md mx-auto rounded-lg shadow-md object-cover"
+                  style={{ maxHeight: '400px' }}
+                  onError={(e) => {
+                    console.log('❌ Image failed to load:', result.image_url);
+                    e.currentTarget.style.display = 'none';
+                  }}
+                />
+              </div>
+            </div>
+          )}
+
           {/* Food Items */}
           <div className="space-y-4 mb-6">
             <div className="flex items-center gap-2">
