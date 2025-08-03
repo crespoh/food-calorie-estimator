@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Loader2, AlertCircle, Utensils, ArrowLeft, ExternalLink } from 'lucide-react';
 import { trackPublicResultView, trackPublicResultShare, trackPublicResultCTA } from '../utils/analytics';
+import DebugInfo from '../components/DebugInfo';
 
 interface PublicResultData {
   id: string;
@@ -57,7 +58,10 @@ const PublicResult: React.FC = () => {
 
   useEffect(() => {
     const fetchPublicResult = async () => {
+      console.log('🔍 PublicResult: Starting fetch for resultId:', resultId);
+      
       if (!resultId) {
+        console.log('❌ PublicResult: No resultId provided');
         setError('No result ID provided');
         setLoading(false);
         return;
@@ -68,8 +72,14 @@ const PublicResult: React.FC = () => {
         setError(null);
 
         const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:3000';
-        const response = await fetch(`${apiBase}/public-result/${resultId}`);
+        const url = `${apiBase}/public-result/${resultId}`;
+        console.log('🔍 PublicResult: Fetching from URL:', url);
+        
+        const response = await fetch(url);
+        console.log('🔍 PublicResult: Response status:', response.status);
+        
         const data = await response.json();
+        console.log('🔍 PublicResult: Response data:', data);
 
         if (!response.ok) {
           throw new Error(data.error || 'Failed to fetch result');
@@ -79,10 +89,12 @@ const PublicResult: React.FC = () => {
           setResult(data.result);
           // Track the public result view
           trackPublicResultView(resultId);
+          console.log('✅ PublicResult: Successfully loaded result');
         } else {
           throw new Error('Invalid response format');
         }
       } catch (err) {
+        console.error('❌ PublicResult: Error fetching result:', err);
         setError(err instanceof Error ? err.message : 'Failed to fetch result');
       } finally {
         setLoading(false);
@@ -135,6 +147,7 @@ const PublicResult: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-blue-50">
+      <DebugInfo />
       <div className="container mx-auto px-4 py-8 max-w-4xl">
         {/* Header */}
         <div className="text-center mb-8">
