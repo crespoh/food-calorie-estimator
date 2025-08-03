@@ -147,7 +147,7 @@ const PublicResult: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-blue-50">
-      <DebugInfo />
+      {/* <DebugInfo /> */}
       <div className="container mx-auto px-4 py-8 max-w-4xl">
         {/* Header */}
         <div className="text-center mb-8">

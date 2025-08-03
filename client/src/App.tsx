@@ -9,7 +9,7 @@ function App() {
   return (
     <AuthProvider>
       <Router>
-        <DebugInfo />
+        {/* <DebugInfo /> */}
         <Routes>
           <Route path="/" element={<UnifiedScreen />} />
           <Route path="/result/:resultId" element={<PublicResult />} />
