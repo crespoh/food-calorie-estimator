@@ -897,7 +897,7 @@ app.get('/api/user-history', async (req, res) => {
 app.get('/api/health', (req, res) => {
   res.json({ 
     status: 'ok', 
-    message: 'Food Calorie Estimator API is running',
+    message: 'CaloriTrack API is running',
     timestamp: new Date().toISOString()
   });
 });
@@ -932,7 +932,7 @@ app.use((error, req, res, next) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`🚀 Food Calorie Estimator server running on port ${PORT}`);
+  console.log(`🚀 CaloriTrack server running on port ${PORT}`);
   console.log(`📱 Frontend: http://localhost:${PORT}`);
   console.log(`🔌 API: http://localhost:${PORT}/api/health`);
   

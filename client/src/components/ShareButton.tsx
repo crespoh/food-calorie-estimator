@@ -30,7 +30,7 @@ const ShareButton: React.FC<ShareButtonProps> = ({ result, resultId }) => {
 
   // Construct share text
   const foodItemsText = result.foodItems.join(', ');
-  const shareText = `🍽️ Just analyzed my food with AI! Found ${foodItemsText} - ${result.totalCalories} calories total. Check out this amazing food calorie estimator!`;
+  const shareText = `🍽️ Just analyzed my food with AI! Found ${foodItemsText} - ${result.totalCalories} calories total. Check out this amazing CaloriTrack app!`;
   
   // Create shareable link (for public result viewing)
   const shareableLink = resultId && isPublic
@@ -67,7 +67,7 @@ const ShareButton: React.FC<ShareButtonProps> = ({ result, resultId }) => {
     if (navigator.share) {
       try {
         await navigator.share({
-          title: 'Food Calorie Analysis',
+          title: 'CaloriTrack Analysis',
           text: shareText,
           url: shareableLink,
         });
@@ -91,7 +91,7 @@ const ShareButton: React.FC<ShareButtonProps> = ({ result, resultId }) => {
 
   // Handle Reddit sharing
   const handleRedditShare = () => {
-    const title = `Food Calorie Analysis: ${result.foodItems.slice(0, 2).join(', ')} - ${result.totalCalories} calories`;
+    const title = `CaloriTrack Analysis: ${result.foodItems.slice(0, 2).join(', ')} - ${result.totalCalories} calories`;
     const redditUrl = `https://www.reddit.com/submit?title=${encodeURIComponent(title)}&text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(shareableLink)}`;
     window.open(redditUrl, '_blank');
     logShareEvent('reddit');

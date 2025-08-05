@@ -1,4 +1,4 @@
-# Food Calorie Estimator Backend
+# CaloriTrack Backend
 
 This backend supports dynamic switching between OpenAI and Qwen2.5-VL for image analysis.
 

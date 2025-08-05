@@ -16,7 +16,7 @@ export default defineConfig({
   server: {
     proxy: {
       '/api': {
-        target: 'https://food-calorie-estimator-production.up.railway.app',
+        target: 'https://caloritrack-production.up.railway.app',
         changeOrigin: true,
       },
     },

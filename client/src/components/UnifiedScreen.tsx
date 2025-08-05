@@ -541,7 +541,7 @@ const UnifiedScreen: React.FC = () => {
       <div className="container mx-auto px-4 py-8 max-w-4xl">
         {/* Header */}
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">🍽️ Food Calorie Estimator</h1>
+          <h1 className="text-4xl font-bold text-gray-900 mb-2">🍽️ CaloriTrack</h1>
           <p className="text-gray-600">Upload a food image to get instant calorie and nutrition analysis</p>
           
           {/* Auth Section */}

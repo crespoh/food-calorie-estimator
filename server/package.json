@@ -1,5 +1,5 @@
 {
-  "name": "food-calorie-estimator-server",
+  "name": "caloritrack-server",
   "version": "1.0.0",
   "private": true,
   "type": "module",

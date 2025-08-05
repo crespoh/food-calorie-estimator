@@ -93,7 +93,7 @@ export default function AuthForm() {
   return (
     <div className="bg-white rounded-xl shadow-lg p-8 max-w-md mx-auto">
       <div className="text-center mb-6">
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">Welcome to Food Calorie Estimator</h2>
+        <h2 className="text-2xl font-bold text-gray-900 mb-2">Welcome to CaloriTrack</h2>
         <p className="text-gray-600">Sign in to get started</p>
       </div>
       

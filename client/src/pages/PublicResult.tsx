@@ -156,10 +156,10 @@ const PublicResult: React.FC = () => {
             className="inline-flex items-center gap-2 text-emerald-600 hover:text-emerald-700 mb-4 transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />
-            Back to Food Calorie Estimator
+            Back to CaloriTrack
           </Link>
           <h1 className="text-4xl font-bold text-gray-900 mb-2">🍽️ Shared Food Analysis</h1>
-          <p className="text-gray-600">This result was shared from our AI-powered food calorie estimator</p>
+          <p className="text-gray-600">This result was shared from our AI-powered CaloriTrack app</p>
         </div>
 
         {/* Result Card */}

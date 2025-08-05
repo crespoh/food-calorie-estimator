@@ -47,8 +47,8 @@ Format your response as a JSON object like this:
       headers: {
         'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
         'Content-Type': 'application/json',
-        'HTTP-Referer': 'https://food-calorie-estimator.vercel.app',
-        'X-Title': 'Food Calorie Estimator'
+            'HTTP-Referer': 'https://caloritrack.vercel.app',
+    'X-Title': 'CaloriTrack'
       },
       body: JSON.stringify({
         model: 'qwen/qwen2.5-vl-72b-instruct:free',

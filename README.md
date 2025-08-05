@@ -1,4 +1,4 @@
-# Food Calorie Estimator 🍎
+# CaloriTrack 🍎
 
 A lightweight, cost-efficient web application that uses OpenAI's Vision API to estimate calories from food photos. No authentication required - just upload and analyze!
 
