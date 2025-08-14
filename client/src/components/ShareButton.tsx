@@ -485,10 +485,10 @@ const ShareButton: React.FC<ShareButtonProps> = ({ result, resultId, onPublicSta
     <div className="relative">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex-1 bg-purple-600 text-white py-2 px-4 rounded-lg font-medium hover:bg-purple-700 transition-colors duration-200 flex items-center justify-center gap-2"
+        className="flex-1 bg-purple-600 text-white py-2 px-4 rounded-lg font-medium hover:bg-purple-700 transition-colors duration-200 flex items-center justify-center gap-2 min-w-[100px]"
       >
-        <Share2 className="w-4 h-4" />
-        Share
+        <Share2 className="w-4 h-4 flex-shrink-0" />
+        <span className="whitespace-nowrap">Share</span>
       </button>
 
       {isOpen && (
@@ -500,46 +500,46 @@ const ShareButton: React.FC<ShareButtonProps> = ({ result, resultId, onPublicSta
           />
           
           {/* Dropdown Menu */}
-          <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-gray-200 rounded-lg shadow-lg z-20 py-2">
+          <div className="absolute top-full left-0 mt-2 bg-white border border-gray-200 rounded-lg shadow-lg z-20 py-2 min-w-[280px] max-w-[320px] sm:min-w-[300px] sm:max-w-[350px]">
             {/* Native Share (Mobile) */}
             <button
               onClick={handleNativeShare}
-              className="w-full px-4 py-2 text-left hover:bg-gray-50 flex items-center gap-3 text-sm"
+              className="w-full px-4 py-3 text-left hover:bg-gray-50 flex items-center gap-3 text-sm whitespace-nowrap"
             >
-              <Share2 className="w-4 h-4 text-blue-600" />
-              {typeof navigator.share === 'function' ? 'Share...' : 'Copy Link'}
+              <Share2 className="w-5 h-5 text-blue-600 flex-shrink-0" />
+              <span className="truncate">{typeof navigator.share === 'function' ? 'Share...' : 'Copy Link'}</span>
             </button>
 
             {/* Twitter */}
             <button
               onClick={handleTwitterShare}
               disabled={generatingImage}
-              className="w-full px-4 py-2 text-left hover:bg-gray-50 flex items-center gap-3 text-sm disabled:opacity-50"
+              className="w-full px-4 py-3 text-left hover:bg-gray-50 flex items-center gap-3 text-sm disabled:opacity-50 whitespace-nowrap"
             >
-              <Twitter className="w-4 h-4 text-blue-400" />
-              {generatingImage ? (imageGenerationProgress || 'Generating...') : 'Share on Twitter'}
+              <Twitter className="w-5 h-5 text-blue-400 flex-shrink-0" />
+              <span className="truncate">{generatingImage ? (imageGenerationProgress || 'Generating...') : 'Share on Twitter'}</span>
             </button>
 
             {/* Reddit */}
             <button
               onClick={handleRedditShare}
               disabled={generatingImage}
-              className="w-full px-4 py-2 text-left hover:bg-gray-50 flex items-center gap-3 text-sm disabled:opacity-50"
+              className="w-full px-4 py-3 text-left hover:bg-gray-50 flex items-center gap-3 text-sm disabled:opacity-50 whitespace-nowrap"
             >
-              <div className="w-4 h-4 bg-orange-500 rounded-sm flex items-center justify-center">
+              <div className="w-5 h-5 bg-orange-500 rounded-sm flex items-center justify-center flex-shrink-0">
                 <span className="text-white text-xs font-bold">R</span>
               </div>
-              {generatingImage ? (imageGenerationProgress || 'Generating...') : 'Share on Reddit'}
+              <span className="truncate">{generatingImage ? (imageGenerationProgress || 'Generating...') : 'Share on Reddit'}</span>
             </button>
 
             {/* Download Share Image */}
             <button
               onClick={handleDownloadImage}
               disabled={generatingDownloadImage}
-              className="w-full px-4 py-2 text-left hover:bg-gray-50 flex items-center gap-3 text-sm disabled:opacity-50"
+              className="w-full px-4 py-3 text-left hover:bg-gray-50 flex items-center gap-3 text-sm disabled:opacity-50 whitespace-nowrap"
             >
-              <Download className="w-4 h-4 text-green-600" />
-              {generatingDownloadImage ? 'Generating...' : 'Download Share Image'}
+              <Download className="w-5 h-5 text-green-600 flex-shrink-0" />
+              <span className="truncate">{generatingDownloadImage ? 'Generating...' : 'Download Share Image'}</span>
             </button>
 
             {/* Preview Share Image */}
@@ -550,65 +550,72 @@ const ShareButton: React.FC<ShareButtonProps> = ({ result, resultId, onPublicSta
                 });
               }}
               disabled={generatingPreviewImage}
-              className="w-full px-4 py-2 text-left hover:bg-gray-50 flex items-center gap-3 text-sm disabled:opacity-50"
+              className="w-full px-4 py-3 text-left hover:bg-gray-50 flex items-center gap-3 text-sm disabled:opacity-50 whitespace-nowrap"
             >
-              <Eye className="w-4 h-4 text-purple-600" />
-              {generatingPreviewImage ? 'Generating...' : 'Preview Share Image'}
+              <Eye className="w-5 h-5 text-purple-600 flex-shrink-0" />
+              <span className="truncate">{generatingPreviewImage ? 'Generating...' : 'Preview Share Image'}</span>
             </button>
 
             {/* Threads */}
             <button
               onClick={handleThreadsShare}
-              className="w-full px-4 py-2 text-left hover:bg-gray-50 flex items-center gap-3 text-sm"
+              className="w-full px-4 py-3 text-left hover:bg-gray-50 flex items-center gap-3 text-sm whitespace-nowrap"
             >
-              <MessageCircle className="w-4 h-4 text-black" />
-              {copied ? (
-                <>
-                  <Check className="w-4 h-4 text-green-600" />
-                  Copied!
-                </>
-              ) : (
-                'Copy for Threads'
-              )}
+              <MessageCircle className="w-5 h-5 text-black flex-shrink-0" />
+              <span className="truncate">
+                {copied ? (
+                  <>
+                    <Check className="w-4 h-4 text-green-600 inline mr-1" />
+                    Copied!
+                  </>
+                ) : (
+                  'Copy for Threads'
+                )}
+              </span>
             </button>
 
             {/* Copy Link */}
             <button
               onClick={handleCopyLink}
-              className="w-full px-4 py-2 text-left hover:bg-gray-50 flex items-center gap-3 text-sm"
+              className="w-full px-4 py-3 text-left hover:bg-gray-50 flex items-center gap-3 text-sm whitespace-nowrap"
             >
-              <Link className="w-4 h-4 text-gray-600" />
-              {copied ? (
-                <>
-                  <Check className="w-4 h-4 text-green-600" />
-                  Copied!
-                </>
-              ) : (
-                'Copy Link'
-              )}
+              <Link className="w-5 h-5 text-gray-600 flex-shrink-0" />
+              <span className="truncate">
+                {copied ? (
+                  <>
+                    <Check className="w-4 h-4 text-green-600 inline mr-1" />
+                    Copied!
+                  </>
+                ) : (
+                  'Copy Link'
+                )}
+              </span>
             </button>
 
             {/* Error Display */}
             {imageGenerationError && (
-              <div className="px-4 py-2 mt-2 text-xs bg-yellow-50 border border-yellow-200 rounded text-yellow-700">
-                ⚠️ {imageGenerationError}
-                <div className="mt-2">
-                  <button
-                    onClick={() => {
-                      const ogUrl = `${import.meta.env.VITE_API_URL?.replace('/api', '')}/og/${resultId}`;
-                      const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(ogUrl)}`;
-                      
-                      // Use mobile-specific sharing utility
-                      openSocialApp('twitter', twitterUrl, shareText);
-                      
-                      logShareEvent('twitter');
-                      setIsOpen(false);
-                      setImageGenerationError(null);
-                    }}
-                    className="text-blue-600 hover:text-blue-800 underline text-xs"
-                  >
-                    Share Now (without image)
-                  </button>
+              <div className="px-4 py-3 mt-2 mx-2 text-xs bg-yellow-50 border border-yellow-200 rounded text-yellow-700">
+                <div className="flex items-start gap-2">
+                  <span className="text-yellow-600 mt-0.5">⚠️</span>
+                  <div className="flex-1">
+                    <p className="text-yellow-700">{imageGenerationError}</p>
+                    <button
+                      onClick={() => {
+                        const ogUrl = `${import.meta.env.VITE_API_URL?.replace('/api', '')}/og/${resultId}`;
+                        const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(ogUrl)}`;
+                        
+                        // Use mobile-specific sharing utility
+                        openSocialApp('twitter', twitterUrl, shareText);
+                        
+                        logShareEvent('twitter');
+                        setIsOpen(false);
+                        setImageGenerationError(null);
+                      }}
+                      className="text-blue-600 hover:text-blue-800 underline text-xs mt-1 inline-block"
+                    >
+                      Share Now (without image)
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
@@ -619,25 +626,32 @@ const ShareButton: React.FC<ShareButtonProps> = ({ result, resultId, onPublicSta
                 <button
                   onClick={handleTogglePublic}
                   disabled={updatingPublic}
-                  className="w-full px-4 py-2 text-left hover:bg-gray-50 flex items-center gap-3 text-sm disabled:opacity-50"
+                  className="w-full px-4 py-3 text-left hover:bg-gray-50 flex items-center gap-3 text-sm disabled:opacity-50 whitespace-nowrap"
                 >
-                  <div className={`w-4 h-4 rounded-sm flex items-center justify-center ${isPublic ? 'bg-red-500' : 'bg-green-500'}`}>
+                  <div className={`w-5 h-5 rounded-sm flex items-center justify-center flex-shrink-0 ${isPublic ? 'bg-red-500' : 'bg-green-500'}`}>
                     <span className="text-white text-xs font-bold">{isPublic ? 'P' : 'P'}</span>
                   </div>
-                  {updatingPublic ? (
-                    `${isPublic ? 'Making Private...' : 'Making Public...'}`
-                  ) : isPublic ? (
-                    <>
-                      <Check className="w-4 h-4 text-green-600" />
-                      Make Private
-                    </>
-                  ) : (
-                    'Make Public Link'
-                  )}
+                  <span className="truncate">
+                    {updatingPublic ? (
+                      `${isPublic ? 'Making Private...' : 'Making Public...'}`
+                    ) : isPublic ? (
+                      <>
+                        <Check className="w-4 h-4 text-green-600 inline mr-1" />
+                        Make Private
+                      </>
+                    ) : (
+                      'Make Public Link'
+                    )}
+                  </span>
                 </button>
                 {showPublicStatus && (
-                  <div className="px-4 py-2 mt-2 text-xs bg-green-50 border border-green-200 rounded text-green-700">
-                    {isPublic ? '✅ Result is now public and shareable!' : '🔒 Result is now private'}
+                  <div className="px-4 py-3 mt-2 mx-2 text-xs bg-green-50 border border-green-200 rounded text-green-700">
+                    <div className="flex items-center gap-2">
+                      <span className="text-green-600">✅</span>
+                      <span className="text-green-700">
+                        {isPublic ? 'Result is now public and shareable!' : 'Result is now private'}
+                      </span>
+                    </div>
                   </div>
                 )}
               </div>
