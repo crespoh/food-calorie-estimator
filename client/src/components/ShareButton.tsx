@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { Share2, Twitter, MessageCircle, Link, Copy, Check } from 'lucide-react';
+import { Share2, Twitter, MessageCircle, Link, Copy, Check, Download, Eye } from 'lucide-react';
 import { useAuth } from '../AuthContext';
 import { supabase } from '../supabaseClient';
+import ShareImagePreview from './ShareImagePreview';
 
 interface ShareButtonProps {
   result: {
@@ -16,6 +17,7 @@ interface ShareButtonProps {
     servingSize?: string;
     confidenceScore?: number;
     explanation: string;
+    is_public?: boolean;
   };
   resultId?: string;
 }
@@ -26,6 +28,9 @@ const ShareButton: React.FC<ShareButtonProps> = ({ result, resultId }) => {
   const [isPublic, setIsPublic] = useState(false);
   const [updatingPublic, setUpdatingPublic] = useState(false);
   const [showPublicStatus, setShowPublicStatus] = useState(false);
+  const [shareImageUrl, setShareImageUrl] = useState<string | null>(null);
+  const [generatingImage, setGeneratingImage] = useState(false);
+  const [showImagePreview, setShowImagePreview] = useState(false);
   const { user } = useAuth();
 
   // Construct share text
@@ -36,6 +41,115 @@ const ShareButton: React.FC<ShareButtonProps> = ({ result, resultId }) => {
   const shareableLink = resultId && isPublic
     ? `${window.location.origin}/result/${resultId}`
     : window.location.origin;
+
+  // Generate share image
+  const generateShareImage = async (platform: string = 'default') => {
+    if (!resultId) return null;
+    
+    setGeneratingImage(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const accessToken = session?.access_token;
+      
+      const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+      const response = await fetch(`${apiBase}/generate-share-image`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(accessToken && { Authorization: `Bearer ${accessToken}` }),
+        },
+        body: JSON.stringify({
+          resultId,
+          platform,
+        }),
+      });
+      
+      const data = await response.json();
+      if (data.success) {
+        setShareImageUrl(data.imageUrl);
+        return data.imageUrl;
+      }
+    } catch (error) {
+      console.error('Failed to generate share image:', error);
+    } finally {
+      setGeneratingImage(false);
+    }
+    return null;
+  };
+
+  // Enhanced share handlers with image generation
+  const handleTwitterShare = async () => {
+    if (!result.is_public) {
+      alert('Please make this result public before sharing');
+      return;
+    }
+    
+    const imageUrl = await generateShareImage('twitter');
+    const ogUrl = `${import.meta.env.VITE_API_URL?.replace('/api', '')}/og/${resultId}`;
+    const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(ogUrl)}`;
+    window.open(twitterUrl, '_blank');
+    logShareEvent('twitter');
+    setIsOpen(false);
+  };
+
+  const handleRedditShare = async () => {
+    if (!result.is_public) {
+      alert('Please make this result public before sharing');
+      return;
+    }
+    
+    const imageUrl = await generateShareImage('reddit');
+    const ogUrl = `${import.meta.env.VITE_API_URL?.replace('/api', '')}/og/${resultId}`;
+    const redditUrl = `https://reddit.com/submit?url=${encodeURIComponent(ogUrl)}&title=${encodeURIComponent(shareText)}`;
+    window.open(redditUrl, '_blank');
+    logShareEvent('reddit');
+    setIsOpen(false);
+  };
+
+  const handleDownloadImage = async () => {
+    const imageUrl = await generateShareImage('download');
+    if (imageUrl) {
+      const link = document.createElement('a');
+      link.href = imageUrl;
+      link.download = `caloritrack-analysis-${resultId}.png`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+  };
+
+  const handleNativeShare = async () => {
+    if (navigator.share) {
+      try {
+        const imageUrl = await generateShareImage('native');
+        const shareData: any = {
+          title: 'CaloriTrack Analysis',
+          text: shareText,
+          url: `${import.meta.env.VITE_API_URL?.replace('/api', '')}/og/${resultId}`,
+        };
+        
+        // Add image file if supported and available
+        if (imageUrl && navigator.canShare && navigator.canShare({ files: [] })) {
+          try {
+            const imageResponse = await fetch(imageUrl);
+            const imageBlob = await imageResponse.blob();
+            const imageFile = new File([imageBlob], 'caloritrack-analysis.png', { type: 'image/png' });
+            shareData.files = [imageFile];
+          } catch (error) {
+            console.log('Failed to add image to native share:', error);
+          }
+        }
+        
+        await navigator.share(shareData);
+        logShareEvent('native');
+      } catch (error) {
+        console.error('Native share failed:', error);
+      }
+    } else {
+      // Fallback to copy link
+      handleCopyLink();
+    }
+  };
 
   // Log share event to Supabase
   const logShareEvent = async (platform: string) => {
@@ -62,41 +176,7 @@ const ShareButton: React.FC<ShareButtonProps> = ({ result, resultId }) => {
     }
   };
 
-  // Handle Web Share API (mobile native sharing)
-  const handleNativeShare = async () => {
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: 'CaloriTrack Analysis',
-          text: shareText,
-          url: shareableLink,
-        });
-        logShareEvent('native');
-      } catch (error) {
-        console.error('Native share failed:', error);
-      }
-    } else {
-      // Fallback to copy link
-      handleCopyLink();
-    }
-  };
 
-  // Handle Twitter sharing
-  const handleTwitterShare = () => {
-    const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(shareableLink)}`;
-    window.open(twitterUrl, '_blank');
-    logShareEvent('twitter');
-    setIsOpen(false);
-  };
-
-  // Handle Reddit sharing
-  const handleRedditShare = () => {
-    const title = `CaloriTrack Analysis: ${result.foodItems.slice(0, 2).join(', ')} - ${result.totalCalories} calories`;
-    const redditUrl = `https://www.reddit.com/submit?title=${encodeURIComponent(title)}&text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(shareableLink)}`;
-    window.open(redditUrl, '_blank');
-    logShareEvent('reddit');
-    setIsOpen(false);
-  };
 
   // Handle Threads sharing (copy link for now)
   const handleThreadsShare = () => {
@@ -174,30 +254,56 @@ const ShareButton: React.FC<ShareButtonProps> = ({ result, resultId }) => {
             {/* Native Share (Mobile) */}
             <button
               onClick={handleNativeShare}
-              className="w-full px-4 py-2 text-left hover:bg-gray-50 flex items-center gap-3 text-sm"
+              disabled={generatingImage}
+              className="w-full px-4 py-2 text-left hover:bg-gray-50 flex items-center gap-3 text-sm disabled:opacity-50"
             >
               <Share2 className="w-4 h-4 text-blue-600" />
-              {typeof navigator.share === 'function' ? 'Share...' : 'Copy Link'}
+              {generatingImage ? 'Generating...' : (typeof navigator.share === 'function' ? 'Share...' : 'Copy Link')}
             </button>
 
             {/* Twitter */}
             <button
               onClick={handleTwitterShare}
-              className="w-full px-4 py-2 text-left hover:bg-gray-50 flex items-center gap-3 text-sm"
+              disabled={generatingImage}
+              className="w-full px-4 py-2 text-left hover:bg-gray-50 flex items-center gap-3 text-sm disabled:opacity-50"
             >
               <Twitter className="w-4 h-4 text-blue-400" />
-              Share on Twitter
+              {generatingImage ? 'Generating...' : 'Share on Twitter'}
             </button>
 
             {/* Reddit */}
             <button
               onClick={handleRedditShare}
-              className="w-full px-4 py-2 text-left hover:bg-gray-50 flex items-center gap-3 text-sm"
+              disabled={generatingImage}
+              className="w-full px-4 py-2 text-left hover:bg-gray-50 flex items-center gap-3 text-sm disabled:opacity-50"
             >
               <div className="w-4 h-4 bg-orange-500 rounded-sm flex items-center justify-center">
                 <span className="text-white text-xs font-bold">R</span>
               </div>
-              Share on Reddit
+              {generatingImage ? 'Generating...' : 'Share on Reddit'}
+            </button>
+
+            {/* Download Share Image */}
+            <button
+              onClick={handleDownloadImage}
+              disabled={generatingImage}
+              className="w-full px-4 py-2 text-left hover:bg-gray-50 flex items-center gap-3 text-sm disabled:opacity-50"
+            >
+              <Download className="w-4 h-4 text-green-600" />
+              {generatingImage ? 'Generating...' : 'Download Share Image'}
+            </button>
+
+            {/* Preview Share Image */}
+            <button
+              onClick={() => {
+                generateShareImage('preview');
+                setShowImagePreview(true);
+              }}
+              disabled={generatingImage}
+              className="w-full px-4 py-2 text-left hover:bg-gray-50 flex items-center gap-3 text-sm disabled:opacity-50"
+            >
+              <Eye className="w-4 h-4 text-purple-600" />
+              {generatingImage ? 'Generating...' : 'Preview Share Image'}
             </button>
 
             {/* Threads */}
@@ -263,6 +369,14 @@ const ShareButton: React.FC<ShareButtonProps> = ({ result, resultId }) => {
             )}
           </div>
         </>
+      )}
+
+      {/* Image Preview Modal */}
+      {showImagePreview && shareImageUrl && (
+        <ShareImagePreview 
+          imageUrl={shareImageUrl} 
+          onClose={() => setShowImagePreview(false)} 
+        />
       )}
     </div>
   );

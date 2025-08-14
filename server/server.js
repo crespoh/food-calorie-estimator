@@ -8,6 +8,7 @@ import fs from 'fs';
 import { createClient } from '@supabase/supabase-js';
 import { analyzeImage } from './utils/llmDispatcher.js';
 import { checkAndRecordUpload } from './utils/uploadLimiter.js';
+import { generateAndStoreSocialImage } from './utils/shareImageGenerator.js';
 
 // ES module dirname equivalent
 const __filename = fileURLToPath(import.meta.url);
@@ -857,6 +858,188 @@ app.get('/api/share-analytics', async (req, res) => {
     });
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch share analytics', details: err.message });
+  }
+});
+
+// Open Graph meta tags route for social sharing
+app.get('/og/:resultId', async (req, res) => {
+  try {
+    const { resultId } = req.params;
+    
+    // Fetch result data
+    const { data: result, error } = await supabase
+      .from('calorie_results')
+      .select('*')
+      .eq('id', resultId)
+      .eq('is_public', true)
+      .single();
+    
+    if (error || !result) {
+      return res.status(404).send(`
+        <html>
+          <head>
+            <title>CaloriTrack - Result Not Found</title>
+            <meta property="og:title" content="CaloriTrack - Result Not Found" />
+            <meta property="og:description" content="This calorie analysis result is not available." />
+            <meta property="og:image" content="${process.env.FRONTEND_URL || 'https://calorie.codedcheese.com'}/assets/default-share-image.png" />
+            <meta property="og:url" content="${process.env.FRONTEND_URL || 'https://calorie.codedcheese.com'}" />
+            <meta name="twitter:card" content="summary_large_image" />
+            <meta name="twitter:title" content="CaloriTrack - Result Not Found" />
+            <meta name="twitter:description" content="This calorie analysis result is not available." />
+            <meta name="twitter:image" content="${process.env.FRONTEND_URL || 'https://calorie.codedcheese.com'}/assets/default-share-image.png" />
+          </head>
+          <body>
+            <script>window.location.href = '${process.env.FRONTEND_URL || 'https://calorie.codedcheese.com'}/result/${resultId}';</script>
+          </body>
+        </html>
+      `);
+    }
+    
+    // Generate social image if not exists
+    let socialImageUrl = result.social_image_url;
+    if (!socialImageUrl) {
+      try {
+        const imageBuffer = await generateAndStoreSocialImage(result);
+        const fileName = `share-images/${result.id}-default-${Date.now()}.png`;
+        
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('public-assets')
+          .upload(fileName, imageBuffer, {
+            contentType: 'image/png',
+            cacheControl: '3600'
+          });
+        
+        if (!uploadError) {
+          const { data: { publicUrl } } = supabase.storage
+            .from('public-assets')
+            .getPublicUrl(fileName);
+          
+          socialImageUrl = publicUrl;
+          
+          // Update result with social image URL
+          await supabase
+            .from('calorie_results')
+            .update({ 
+              social_image_url: socialImageUrl,
+              social_image_generated_at: new Date().toISOString()
+            })
+            .eq('id', resultId);
+        }
+      } catch (error) {
+        console.error('Failed to generate social image:', error);
+        socialImageUrl = `${process.env.FRONTEND_URL || 'https://calorie.codedcheese.com'}/assets/default-share-image.png`;
+      }
+    }
+    
+    // Create food items text
+    const foodItemsText = result.food_items?.join(', ') || 'Food items';
+    
+    // Generate meta tags
+    const metaTags = `
+      <html>
+        <head>
+          <title>CaloriTrack - ${foodItemsText} (${result.total_calories} calories)</title>
+          <meta property="og:title" content="CaloriTrack - ${foodItemsText}" />
+          <meta property="og:description" content="${foodItemsText} - ${result.total_calories} calories total. Analyzed with AI-powered CaloriTrack!" />
+          <meta property="og:image" content="${socialImageUrl}" />
+          <meta property="og:url" content="${process.env.FRONTEND_URL || 'https://calorie.codedcheese.com'}/result/${resultId}" />
+          <meta property="og:type" content="website" />
+          <meta name="twitter:card" content="summary_large_image" />
+          <meta name="twitter:title" content="CaloriTrack - ${foodItemsText}" />
+          <meta name="twitter:description" content="${foodItemsText} - ${result.total_calories} calories total. Analyzed with AI-powered CaloriTrack!" />
+          <meta name="twitter:image" content="${socialImageUrl}" />
+          <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        </head>
+        <body>
+          <script>window.location.href = '${process.env.FRONTEND_URL || 'https://calorie.codedcheese.com'}/result/${resultId}';</script>
+        </body>
+      </html>
+    `;
+    
+    res.setHeader('Content-Type', 'text/html');
+    res.send(metaTags);
+  } catch (error) {
+    console.error('OG route error:', error);
+    res.status(500).send('Error generating preview');
+  }
+});
+
+// Generate share image endpoint
+app.post('/api/generate-share-image', async (req, res) => {
+  try {
+    const { resultId, platform = 'default' } = req.body;
+    
+    // Extract token from Authorization header
+    const authHeader = req.headers['authorization'] || req.headers['Authorization'];
+    const sessionToken = authHeader?.startsWith('Bearer ') ? authHeader.replace('Bearer ', '') : null;
+    
+    if (!sessionToken) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+    
+    // Validate with Supabase for authenticated users
+    const { data: { user }, error: userError } = await supabase.auth.getUser(sessionToken);
+    if (userError || !user) {
+      return res.status(401).json({ error: 'Invalid authentication token' });
+    }
+    
+    // Fetch result data
+    const { data: result, error } = await supabase
+      .from('calorie_results')
+      .select('*')
+      .eq('id', resultId)
+      .single();
+    
+    if (error || !result) {
+      return res.status(404).json({ error: 'Result not found' });
+    }
+    
+    // Check if user owns the result or result is public
+    if (result.user_id !== user.id && !result.is_public) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+    
+    // Generate social image
+    const imageBuffer = await generateAndStoreSocialImage(result, platform);
+    const fileName = `share-images/${resultId}-${platform}-${Date.now()}.png`;
+    
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from('public-assets')
+      .upload(fileName, imageBuffer, {
+        contentType: 'image/png',
+        cacheControl: '3600'
+      });
+    
+    if (uploadError) throw uploadError;
+    
+    const { data: { publicUrl } } = supabase.storage
+      .from('public-assets')
+      .getPublicUrl(fileName);
+    
+    // Update result with social image URL
+    await supabase
+      .from('calorie_results')
+      .update({ 
+        social_image_url: publicUrl,
+        social_image_generated_at: new Date().toISOString()
+      })
+      .eq('id', resultId);
+    
+    // Log share image generation
+    await supabase
+      .from('share_images')
+      .insert({
+        result_id: resultId,
+        user_id: user.id,
+        platform,
+        image_url: publicUrl,
+        metadata: { platform, generated_at: new Date().toISOString() }
+      });
+    
+    res.json({ success: true, imageUrl: publicUrl });
+  } catch (error) {
+    console.error('Share image generation error:', error);
+    res.status(500).json({ error: 'Failed to generate share image' });
   }
 });
 

@@ -44,4 +44,16 @@ export const trackPublicResultShare = (resultId: string) => {
 
 export const trackPublicResultCTA = (resultId: string) => {
   trackEvent('public_result_cta_click', resultId);
+};
+
+export const trackShareImageGenerated = async (resultId: string, platform: string) => {
+  await trackEvent('share_image_generated', resultId);
+};
+
+export const trackShareImageDownloaded = async (resultId: string) => {
+  await trackEvent('share_image_downloaded', resultId);
+};
+
+export const trackNativeShareWithImage = async (resultId: string, platform: string) => {
+  await trackEvent('native_share_with_image', resultId);
 }; 
