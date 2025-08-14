@@ -31,6 +31,8 @@ const ShareButton: React.FC<ShareButtonProps> = ({ result, resultId, onPublicSta
   const [showPublicStatus, setShowPublicStatus] = useState(false);
   const [shareImageUrl, setShareImageUrl] = useState<string | null>(null);
   const [generatingImage, setGeneratingImage] = useState(false);
+  const [generatingDownloadImage, setGeneratingDownloadImage] = useState(false);
+  const [generatingPreviewImage, setGeneratingPreviewImage] = useState(false);
   const [showImagePreview, setShowImagePreview] = useState(false);
   const { user } = useAuth();
 
@@ -52,10 +54,15 @@ const ShareButton: React.FC<ShareButtonProps> = ({ result, resultId, onPublicSta
     : window.location.origin;
 
   // Generate share image
-  const generateShareImage = async (platform: string = 'default') => {
+  const generateShareImage = async (platform: string = 'default', setLoadingState?: (loading: boolean) => void) => {
     if (!resultId) return null;
     
-    setGeneratingImage(true);
+    if (setLoadingState) {
+      setLoadingState(true);
+    } else {
+      setGeneratingImage(true);
+    }
+    
     try {
       const { data: { session } } = await supabase.auth.getSession();
       const accessToken = session?.access_token;
@@ -81,7 +88,11 @@ const ShareButton: React.FC<ShareButtonProps> = ({ result, resultId, onPublicSta
     } catch (error) {
       console.error('Failed to generate share image:', error);
     } finally {
-      setGeneratingImage(false);
+      if (setLoadingState) {
+        setLoadingState(false);
+      } else {
+        setGeneratingImage(false);
+      }
     }
     return null;
   };
@@ -94,12 +105,18 @@ const ShareButton: React.FC<ShareButtonProps> = ({ result, resultId, onPublicSta
       return;
     }
     
-    const imageUrl = await generateShareImage('twitter');
+    // For Twitter sharing, we don't need to wait for image generation
+    // Just open Twitter immediately with the URL
     const ogUrl = `${import.meta.env.VITE_API_URL?.replace('/api', '')}/og/${resultId}`;
     const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(ogUrl)}`;
     window.open(twitterUrl, '_blank');
     logShareEvent('twitter');
     setIsOpen(false);
+    
+    // Generate image in background for future use (optional)
+    generateShareImage('twitter').catch(error => {
+      console.error('Failed to generate Twitter share image:', error);
+    });
   };
 
   const handleRedditShare = async () => {
@@ -109,16 +126,22 @@ const ShareButton: React.FC<ShareButtonProps> = ({ result, resultId, onPublicSta
       return;
     }
     
-    const imageUrl = await generateShareImage('reddit');
+    // For Reddit sharing, we don't need to wait for image generation
+    // Just open Reddit immediately with the URL
     const ogUrl = `${import.meta.env.VITE_API_URL?.replace('/api', '')}/og/${resultId}`;
     const redditUrl = `https://reddit.com/submit?url=${encodeURIComponent(ogUrl)}&title=${encodeURIComponent(shareText)}`;
     window.open(redditUrl, '_blank');
     logShareEvent('reddit');
     setIsOpen(false);
+    
+    // Generate image in background for future use (optional)
+    generateShareImage('reddit').catch(error => {
+      console.error('Failed to generate Reddit share image:', error);
+    });
   };
 
   const handleDownloadImage = async () => {
-    const imageUrl = await generateShareImage('download');
+    const imageUrl = await generateShareImage('download', setGeneratingDownloadImage);
     if (imageUrl) {
       const link = document.createElement('a');
       link.href = imageUrl;
@@ -132,25 +155,36 @@ const ShareButton: React.FC<ShareButtonProps> = ({ result, resultId, onPublicSta
   const handleNativeShare = async () => {
     if (navigator.share) {
       try {
-        const imageUrl = await generateShareImage('native');
         const shareData: any = {
           title: 'CaloriTrack Analysis',
           text: shareText,
           url: `${import.meta.env.VITE_API_URL?.replace('/api', '')}/og/${resultId}`,
         };
         
-        // Add image file if supported and available
-        if (imageUrl && navigator.canShare && navigator.canShare({ files: [] })) {
-          try {
-            const imageResponse = await fetch(imageUrl);
-            const imageBlob = await imageResponse.blob();
-            const imageFile = new File([imageBlob], 'caloritrack-analysis.png', { type: 'image/png' });
-            shareData.files = [imageFile];
-          } catch (error) {
-            console.log('Failed to add image to native share:', error);
+        // Try to add image file if supported and available
+        // Generate image in background and add if successful
+        generateShareImage('native').then(imageUrl => {
+          if (imageUrl && navigator.canShare && navigator.canShare({ files: [] })) {
+            try {
+              fetch(imageUrl).then(imageResponse => {
+                imageResponse.blob().then(imageBlob => {
+                  const imageFile = new File([imageBlob], 'caloritrack-analysis.png', { type: 'image/png' });
+                  shareData.files = [imageFile];
+                  // Re-trigger share with image
+                  navigator.share(shareData).catch(error => {
+                    console.log('Failed to share with image:', error);
+                  });
+                });
+              });
+            } catch (error) {
+              console.log('Failed to add image to native share:', error);
+            }
           }
-        }
+        }).catch(error => {
+          console.log('Failed to generate image for native share:', error);
+        });
         
+        // Share immediately without waiting for image
         await navigator.share(shareData);
         logShareEvent('native');
       } catch (error) {
@@ -271,56 +305,54 @@ const ShareButton: React.FC<ShareButtonProps> = ({ result, resultId, onPublicSta
             {/* Native Share (Mobile) */}
             <button
               onClick={handleNativeShare}
-              disabled={generatingImage}
-              className="w-full px-4 py-2 text-left hover:bg-gray-50 flex items-center gap-3 text-sm disabled:opacity-50"
+              className="w-full px-4 py-2 text-left hover:bg-gray-50 flex items-center gap-3 text-sm"
             >
               <Share2 className="w-4 h-4 text-blue-600" />
-              {generatingImage ? 'Generating...' : (typeof navigator.share === 'function' ? 'Share...' : 'Copy Link')}
+              {typeof navigator.share === 'function' ? 'Share...' : 'Copy Link'}
             </button>
 
             {/* Twitter */}
             <button
               onClick={handleTwitterShare}
-              disabled={generatingImage}
-              className="w-full px-4 py-2 text-left hover:bg-gray-50 flex items-center gap-3 text-sm disabled:opacity-50"
+              className="w-full px-4 py-2 text-left hover:bg-gray-50 flex items-center gap-3 text-sm"
             >
               <Twitter className="w-4 h-4 text-blue-400" />
-              {generatingImage ? 'Generating...' : 'Share on Twitter'}
+              Share on Twitter
             </button>
 
             {/* Reddit */}
             <button
               onClick={handleRedditShare}
-              disabled={generatingImage}
-              className="w-full px-4 py-2 text-left hover:bg-gray-50 flex items-center gap-3 text-sm disabled:opacity-50"
+              className="w-full px-4 py-2 text-left hover:bg-gray-50 flex items-center gap-3 text-sm"
             >
               <div className="w-4 h-4 bg-orange-500 rounded-sm flex items-center justify-center">
                 <span className="text-white text-xs font-bold">R</span>
               </div>
-              {generatingImage ? 'Generating...' : 'Share on Reddit'}
+              Share on Reddit
             </button>
 
             {/* Download Share Image */}
             <button
               onClick={handleDownloadImage}
-              disabled={generatingImage}
+              disabled={generatingDownloadImage}
               className="w-full px-4 py-2 text-left hover:bg-gray-50 flex items-center gap-3 text-sm disabled:opacity-50"
             >
               <Download className="w-4 h-4 text-green-600" />
-              {generatingImage ? 'Generating...' : 'Download Share Image'}
+              {generatingDownloadImage ? 'Generating...' : 'Download Share Image'}
             </button>
 
             {/* Preview Share Image */}
             <button
               onClick={() => {
-                generateShareImage('preview');
-                setShowImagePreview(true);
+                generateShareImage('preview', setGeneratingPreviewImage).then(() => {
+                  setShowImagePreview(true);
+                });
               }}
-              disabled={generatingImage}
+              disabled={generatingPreviewImage}
               className="w-full px-4 py-2 text-left hover:bg-gray-50 flex items-center gap-3 text-sm disabled:opacity-50"
             >
               <Eye className="w-4 h-4 text-purple-600" />
-              {generatingImage ? 'Generating...' : 'Preview Share Image'}
+              {generatingPreviewImage ? 'Generating...' : 'Preview Share Image'}
             </button>
 
             {/* Threads */}
