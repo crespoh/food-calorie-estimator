@@ -34,6 +34,8 @@ const ShareButton: React.FC<ShareButtonProps> = ({ result, resultId, onPublicSta
   const [generatingDownloadImage, setGeneratingDownloadImage] = useState(false);
   const [generatingPreviewImage, setGeneratingPreviewImage] = useState(false);
   const [showImagePreview, setShowImagePreview] = useState(false);
+  const [imageGenerationError, setImageGenerationError] = useState<string | null>(null);
+  const [imageGenerationProgress, setImageGenerationProgress] = useState<string>('');
   const { user } = useAuth();
 
   // Sync isPublic state with result.is_public
@@ -53,9 +55,18 @@ const ShareButton: React.FC<ShareButtonProps> = ({ result, resultId, onPublicSta
     ? `${window.location.origin}/result/${resultId}`
     : window.location.origin;
 
-  // Generate share image
+  // Generate share image (legacy function for backward compatibility)
   const generateShareImage = async (platform: string = 'default', setLoadingState?: (loading: boolean) => void) => {
+    return generateShareImageWithTimeout(platform, setLoadingState);
+  };
+
+  // Generate share image with timeout and better error handling
+  const generateShareImageWithTimeout = async (platform: string = 'default', setLoadingState?: (loading: boolean) => void) => {
     if (!resultId) return null;
+    
+    const timeoutMs = 15000; // 15 second timeout
+    setImageGenerationError(null);
+    setImageGenerationProgress('Starting image generation...');
     
     if (setLoadingState) {
       setLoadingState(true);
@@ -67,8 +78,17 @@ const ShareButton: React.FC<ShareButtonProps> = ({ result, resultId, onPublicSta
       const { data: { session } } = await supabase.auth.getSession();
       const accessToken = session?.access_token;
       
+      setImageGenerationProgress('Creating image...');
+      
       const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:3000';
-      const response = await fetch(`${apiBase}/generate-share-image`, {
+      
+      // Create a timeout promise
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Image generation timed out')), timeoutMs);
+      });
+      
+      // Create the fetch promise
+      const fetchPromise = fetch(`${apiBase}/generate-share-image`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -80,21 +100,36 @@ const ShareButton: React.FC<ShareButtonProps> = ({ result, resultId, onPublicSta
         }),
       });
       
+      // Race between fetch and timeout
+      const response = await Promise.race([fetchPromise, timeoutPromise]) as Response;
+      
+      if (!response.ok) {
+        throw new Error(`Server error: ${response.status}`);
+      }
+      
+      setImageGenerationProgress('Processing response...');
       const data = await response.json();
+      
       if (data.success) {
+        setImageGenerationProgress('Image ready!');
         setShareImageUrl(data.imageUrl);
         return data.imageUrl;
+      } else {
+        throw new Error(data.error || 'Failed to generate image');
       }
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
       console.error('Failed to generate share image:', error);
+      setImageGenerationError(errorMessage);
+      throw error;
     } finally {
       if (setLoadingState) {
         setLoadingState(false);
       } else {
         setGeneratingImage(false);
       }
+      setImageGenerationProgress('');
     }
-    return null;
   };
 
   // Enhanced share handlers with image generation
@@ -108,11 +143,14 @@ const ShareButton: React.FC<ShareButtonProps> = ({ result, resultId, onPublicSta
     // For Twitter sharing, we need to ensure the image is generated first
     // so Twitter can see it when crawling the URL
     setGeneratingImage(true);
+    setImageGenerationError(null);
+    
     try {
       // Generate the image first to ensure it's available for Twitter
-      await generateShareImage('twitter');
+      await generateShareImageWithTimeout('twitter');
       
       // Small delay to ensure the image is fully uploaded and accessible
+      setImageGenerationProgress('Finalizing...');
       await new Promise(resolve => setTimeout(resolve, 1000));
       
       // Now open Twitter with the URL that has the image ready
@@ -123,14 +161,20 @@ const ShareButton: React.FC<ShareButtonProps> = ({ result, resultId, onPublicSta
       setIsOpen(false);
     } catch (error) {
       console.error('Failed to generate Twitter share image:', error);
-      // Fallback: open Twitter without waiting for image
-      const ogUrl = `${import.meta.env.VITE_API_URL?.replace('/api', '')}/og/${resultId}`;
-      const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(ogUrl)}`;
-      window.open(twitterUrl, '_blank');
-      logShareEvent('twitter');
-      setIsOpen(false);
+      setImageGenerationError('Image generation failed, but you can still share!');
+      
+      // Show error message briefly, then open Twitter
+      setTimeout(() => {
+        const ogUrl = `${import.meta.env.VITE_API_URL?.replace('/api', '')}/og/${resultId}`;
+        const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(ogUrl)}`;
+        window.open(twitterUrl, '_blank');
+        logShareEvent('twitter');
+        setIsOpen(false);
+        setImageGenerationError(null);
+      }, 2000);
     } finally {
       setGeneratingImage(false);
+      setImageGenerationProgress('');
     }
   };
 
@@ -144,11 +188,14 @@ const ShareButton: React.FC<ShareButtonProps> = ({ result, resultId, onPublicSta
     // For Reddit sharing, we need to ensure the image is generated first
     // so Reddit can see it when crawling the URL
     setGeneratingImage(true);
+    setImageGenerationError(null);
+    
     try {
       // Generate the image first to ensure it's available for Reddit
-      await generateShareImage('reddit');
+      await generateShareImageWithTimeout('reddit');
       
       // Small delay to ensure the image is fully uploaded and accessible
+      setImageGenerationProgress('Finalizing...');
       await new Promise(resolve => setTimeout(resolve, 1000));
       
       // Now open Reddit with the URL that has the image ready
@@ -159,14 +206,20 @@ const ShareButton: React.FC<ShareButtonProps> = ({ result, resultId, onPublicSta
       setIsOpen(false);
     } catch (error) {
       console.error('Failed to generate Reddit share image:', error);
-      // Fallback: open Reddit without waiting for image
-      const ogUrl = `${import.meta.env.VITE_API_URL?.replace('/api', '')}/og/${resultId}`;
-      const redditUrl = `https://reddit.com/submit?url=${encodeURIComponent(ogUrl)}&title=${encodeURIComponent(shareText)}`;
-      window.open(redditUrl, '_blank');
-      logShareEvent('reddit');
-      setIsOpen(false);
+      setImageGenerationError('Image generation failed, but you can still share!');
+      
+      // Show error message briefly, then open Reddit
+      setTimeout(() => {
+        const ogUrl = `${import.meta.env.VITE_API_URL?.replace('/api', '')}/og/${resultId}`;
+        const redditUrl = `https://reddit.com/submit?url=${encodeURIComponent(ogUrl)}&title=${encodeURIComponent(shareText)}`;
+        window.open(redditUrl, '_blank');
+        logShareEvent('reddit');
+        setIsOpen(false);
+        setImageGenerationError(null);
+      }, 2000);
     } finally {
       setGeneratingImage(false);
+      setImageGenerationProgress('');
     }
   };
 
@@ -348,7 +401,7 @@ const ShareButton: React.FC<ShareButtonProps> = ({ result, resultId, onPublicSta
               className="w-full px-4 py-2 text-left hover:bg-gray-50 flex items-center gap-3 text-sm disabled:opacity-50"
             >
               <Twitter className="w-4 h-4 text-blue-400" />
-              {generatingImage ? 'Generating...' : 'Share on Twitter'}
+              {generatingImage ? (imageGenerationProgress || 'Generating...') : 'Share on Twitter'}
             </button>
 
             {/* Reddit */}
@@ -360,7 +413,7 @@ const ShareButton: React.FC<ShareButtonProps> = ({ result, resultId, onPublicSta
               <div className="w-4 h-4 bg-orange-500 rounded-sm flex items-center justify-center">
                 <span className="text-white text-xs font-bold">R</span>
               </div>
-              {generatingImage ? 'Generating...' : 'Share on Reddit'}
+              {generatingImage ? (imageGenerationProgress || 'Generating...') : 'Share on Reddit'}
             </button>
 
             {/* Download Share Image */}
@@ -418,6 +471,13 @@ const ShareButton: React.FC<ShareButtonProps> = ({ result, resultId, onPublicSta
                 'Copy Link'
               )}
             </button>
+
+            {/* Error Display */}
+            {imageGenerationError && (
+              <div className="px-4 py-2 mt-2 text-xs bg-yellow-50 border border-yellow-200 rounded text-yellow-700">
+                ⚠️ {imageGenerationError}
+              </div>
+            )}
 
             {/* Make Public Toggle */}
             {resultId && user && (
