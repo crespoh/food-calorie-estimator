@@ -73,7 +73,7 @@ const ShareButton: React.FC<ShareButtonProps> = ({ result, resultId, onPublicSta
       return null;
     }
     
-    const timeoutMs = 15000; // 15 second timeout
+    const timeoutMs = 30000; // 30 second timeout (increased from 15s)
     setImageGenerationError(null);
     setImageGenerationProgress('Starting image generation...');
     console.log('🖼️ Starting image generation for platform:', platform, 'resultId:', resultId);
@@ -96,11 +96,21 @@ const ShareButton: React.FC<ShareButtonProps> = ({ result, resultId, onPublicSta
       const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:3000';
       console.log('🌐 API Base URL:', apiBase);
       
-      // Create a timeout promise
+      // Create a timeout promise with progress updates
       const timeoutPromise = new Promise((_, reject) => {
+        const startTime = Date.now();
+        const progressInterval = setInterval(() => {
+          const elapsed = Date.now() - startTime;
+          const remaining = timeoutMs - elapsed;
+          if (remaining > 0) {
+            setImageGenerationProgress(`Creating image... (${Math.ceil(remaining / 1000)}s remaining)`);
+          }
+        }, 1000);
+        
         setTimeout(() => {
+          clearInterval(progressInterval);
           console.log('⏰ Image generation timed out after', timeoutMs, 'ms');
-          reject(new Error('Image generation timed out'));
+          reject(new Error(`Image generation timed out after ${timeoutMs / 1000} seconds`));
         }, timeoutMs);
       });
       
@@ -216,7 +226,8 @@ const ShareButton: React.FC<ShareButtonProps> = ({ result, resultId, onPublicSta
         error: error
       });
       
-      setImageGenerationError(`Image generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      setImageGenerationError(`Image generation failed: ${errorMessage}`);
       
       // Show error message briefly, then open Twitter
       console.log('🔄 Falling back to Twitter without image...');
@@ -535,6 +546,21 @@ const ShareButton: React.FC<ShareButtonProps> = ({ result, resultId, onPublicSta
             {imageGenerationError && (
               <div className="px-4 py-2 mt-2 text-xs bg-yellow-50 border border-yellow-200 rounded text-yellow-700">
                 ⚠️ {imageGenerationError}
+                <div className="mt-2">
+                  <button
+                    onClick={() => {
+                      const ogUrl = `${import.meta.env.VITE_API_URL?.replace('/api', '')}/og/${resultId}`;
+                      const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(ogUrl)}`;
+                      window.open(twitterUrl, '_blank');
+                      logShareEvent('twitter');
+                      setIsOpen(false);
+                      setImageGenerationError(null);
+                    }}
+                    className="text-blue-600 hover:text-blue-800 underline text-xs"
+                  >
+                    Share Now (without image)
+                  </button>
+                </div>
               </div>
             )}
 
