@@ -105,18 +105,33 @@ const ShareButton: React.FC<ShareButtonProps> = ({ result, resultId, onPublicSta
       return;
     }
     
-    // For Twitter sharing, we don't need to wait for image generation
-    // Just open Twitter immediately with the URL
-    const ogUrl = `${import.meta.env.VITE_API_URL?.replace('/api', '')}/og/${resultId}`;
-    const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(ogUrl)}`;
-    window.open(twitterUrl, '_blank');
-    logShareEvent('twitter');
-    setIsOpen(false);
-    
-    // Generate image in background for future use (optional)
-    generateShareImage('twitter').catch(error => {
+    // For Twitter sharing, we need to ensure the image is generated first
+    // so Twitter can see it when crawling the URL
+    setGeneratingImage(true);
+    try {
+      // Generate the image first to ensure it's available for Twitter
+      await generateShareImage('twitter');
+      
+      // Small delay to ensure the image is fully uploaded and accessible
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Now open Twitter with the URL that has the image ready
+      const ogUrl = `${import.meta.env.VITE_API_URL?.replace('/api', '')}/og/${resultId}`;
+      const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(ogUrl)}`;
+      window.open(twitterUrl, '_blank');
+      logShareEvent('twitter');
+      setIsOpen(false);
+    } catch (error) {
       console.error('Failed to generate Twitter share image:', error);
-    });
+      // Fallback: open Twitter without waiting for image
+      const ogUrl = `${import.meta.env.VITE_API_URL?.replace('/api', '')}/og/${resultId}`;
+      const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(ogUrl)}`;
+      window.open(twitterUrl, '_blank');
+      logShareEvent('twitter');
+      setIsOpen(false);
+    } finally {
+      setGeneratingImage(false);
+    }
   };
 
   const handleRedditShare = async () => {
@@ -126,18 +141,33 @@ const ShareButton: React.FC<ShareButtonProps> = ({ result, resultId, onPublicSta
       return;
     }
     
-    // For Reddit sharing, we don't need to wait for image generation
-    // Just open Reddit immediately with the URL
-    const ogUrl = `${import.meta.env.VITE_API_URL?.replace('/api', '')}/og/${resultId}`;
-    const redditUrl = `https://reddit.com/submit?url=${encodeURIComponent(ogUrl)}&title=${encodeURIComponent(shareText)}`;
-    window.open(redditUrl, '_blank');
-    logShareEvent('reddit');
-    setIsOpen(false);
-    
-    // Generate image in background for future use (optional)
-    generateShareImage('reddit').catch(error => {
+    // For Reddit sharing, we need to ensure the image is generated first
+    // so Reddit can see it when crawling the URL
+    setGeneratingImage(true);
+    try {
+      // Generate the image first to ensure it's available for Reddit
+      await generateShareImage('reddit');
+      
+      // Small delay to ensure the image is fully uploaded and accessible
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Now open Reddit with the URL that has the image ready
+      const ogUrl = `${import.meta.env.VITE_API_URL?.replace('/api', '')}/og/${resultId}`;
+      const redditUrl = `https://reddit.com/submit?url=${encodeURIComponent(ogUrl)}&title=${encodeURIComponent(shareText)}`;
+      window.open(redditUrl, '_blank');
+      logShareEvent('reddit');
+      setIsOpen(false);
+    } catch (error) {
       console.error('Failed to generate Reddit share image:', error);
-    });
+      // Fallback: open Reddit without waiting for image
+      const ogUrl = `${import.meta.env.VITE_API_URL?.replace('/api', '')}/og/${resultId}`;
+      const redditUrl = `https://reddit.com/submit?url=${encodeURIComponent(ogUrl)}&title=${encodeURIComponent(shareText)}`;
+      window.open(redditUrl, '_blank');
+      logShareEvent('reddit');
+      setIsOpen(false);
+    } finally {
+      setGeneratingImage(false);
+    }
   };
 
   const handleDownloadImage = async () => {
@@ -314,21 +344,23 @@ const ShareButton: React.FC<ShareButtonProps> = ({ result, resultId, onPublicSta
             {/* Twitter */}
             <button
               onClick={handleTwitterShare}
-              className="w-full px-4 py-2 text-left hover:bg-gray-50 flex items-center gap-3 text-sm"
+              disabled={generatingImage}
+              className="w-full px-4 py-2 text-left hover:bg-gray-50 flex items-center gap-3 text-sm disabled:opacity-50"
             >
               <Twitter className="w-4 h-4 text-blue-400" />
-              Share on Twitter
+              {generatingImage ? 'Generating...' : 'Share on Twitter'}
             </button>
 
             {/* Reddit */}
             <button
               onClick={handleRedditShare}
-              className="w-full px-4 py-2 text-left hover:bg-gray-50 flex items-center gap-3 text-sm"
+              disabled={generatingImage}
+              className="w-full px-4 py-2 text-left hover:bg-gray-50 flex items-center gap-3 text-sm disabled:opacity-50"
             >
               <div className="w-4 h-4 bg-orange-500 rounded-sm flex items-center justify-center">
                 <span className="text-white text-xs font-bold">R</span>
               </div>
-              Share on Reddit
+              {generatingImage ? 'Generating...' : 'Share on Reddit'}
             </button>
 
             {/* Download Share Image */}
