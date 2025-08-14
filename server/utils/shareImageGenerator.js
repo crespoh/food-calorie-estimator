@@ -98,7 +98,11 @@ const generateAndStoreSocialImage = async (result, platform = 'default') => {
   // Nutrition facts if available
   if (result.nutrition_table) {
     try {
-      const nutrition = JSON.parse(result.nutrition_table);
+      // Handle both string (JSON) and object formats
+      const nutrition = typeof result.nutrition_table === 'string' 
+        ? JSON.parse(result.nutrition_table) 
+        : result.nutrition_table;
+      
       ctx.font = '20px Arial, sans-serif';
       ctx.fillText(`Protein: ${nutrition.protein_g || 0}g`, 400, 380);
       ctx.fillText(`Carbs: ${nutrition.carbs_g || 0}g`, 400, 410);
