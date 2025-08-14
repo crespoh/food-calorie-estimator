@@ -224,6 +224,12 @@ const ShareButton: React.FC<ShareButtonProps> = ({ result, resultId, onPublicSta
       return;
     }
     
+    // Check if user is anonymous (not logged in)
+    if (!user) {
+      alert('Anonymous results cannot be shared publicly. Please sign in to share your analysis.');
+      return;
+    }
+    
     if (!isPublic) {
       alert('Please make this result public before sharing');
       return;
@@ -293,6 +299,13 @@ const ShareButton: React.FC<ShareButtonProps> = ({ result, resultId, onPublicSta
 
   const handleRedditShare = async () => {
     console.log('🔴 Reddit share clicked, isPublic:', isPublic, 'result.is_public:', result.is_public);
+    
+    // Check if user is anonymous (not logged in)
+    if (!user) {
+      alert('Anonymous results cannot be shared publicly. Please sign in to share your analysis.');
+      return;
+    }
+    
     if (!isPublic) {
       alert('Please make this result public before sharing');
       return;
@@ -352,6 +365,12 @@ const ShareButton: React.FC<ShareButtonProps> = ({ result, resultId, onPublicSta
   };
 
   const handleNativeShare = async () => {
+    // Check if user is anonymous (not logged in)
+    if (!user) {
+      alert('Anonymous results cannot be shared publicly. Please sign in to share your analysis.');
+      return;
+    }
+    
     if (navigator.share) {
       try {
         const shareData: any = {
@@ -504,32 +523,39 @@ const ShareButton: React.FC<ShareButtonProps> = ({ result, resultId, onPublicSta
             {/* Native Share (Mobile) */}
             <button
               onClick={handleNativeShare}
-              className="w-full px-4 py-3 text-left hover:bg-gray-50 flex items-center gap-3 text-sm whitespace-nowrap"
+              disabled={!user}
+              className="w-full px-4 py-3 text-left hover:bg-gray-50 flex items-center gap-3 text-sm whitespace-nowrap disabled:opacity-50"
             >
               <Share2 className="w-5 h-5 text-blue-600 flex-shrink-0" />
-              <span className="truncate">{typeof navigator.share === 'function' ? 'Share...' : 'Copy Link'}</span>
+              <span className="truncate">
+                {!user ? 'Sign in to share' : (typeof navigator.share === 'function' ? 'Share...' : 'Copy Link')}
+              </span>
             </button>
 
             {/* Twitter */}
             <button
               onClick={handleTwitterShare}
-              disabled={generatingImage}
+              disabled={generatingImage || !user}
               className="w-full px-4 py-3 text-left hover:bg-gray-50 flex items-center gap-3 text-sm disabled:opacity-50 whitespace-nowrap"
             >
               <Twitter className="w-5 h-5 text-blue-400 flex-shrink-0" />
-              <span className="truncate">{generatingImage ? (imageGenerationProgress || 'Generating...') : 'Share on Twitter'}</span>
+              <span className="truncate">
+                {!user ? 'Sign in to share' : (generatingImage ? (imageGenerationProgress || 'Generating...') : 'Share on Twitter')}
+              </span>
             </button>
 
             {/* Reddit */}
             <button
               onClick={handleRedditShare}
-              disabled={generatingImage}
+              disabled={generatingImage || !user}
               className="w-full px-4 py-3 text-left hover:bg-gray-50 flex items-center gap-3 text-sm disabled:opacity-50 whitespace-nowrap"
             >
               <div className="w-5 h-5 bg-orange-500 rounded-sm flex items-center justify-center flex-shrink-0">
                 <span className="text-white text-xs font-bold">R</span>
               </div>
-              <span className="truncate">{generatingImage ? (imageGenerationProgress || 'Generating...') : 'Share on Reddit'}</span>
+              <span className="truncate">
+                {!user ? 'Sign in to share' : (generatingImage ? (imageGenerationProgress || 'Generating...') : 'Share on Reddit')}
+              </span>
             </button>
 
             {/* Download Share Image */}
@@ -591,6 +617,20 @@ const ShareButton: React.FC<ShareButtonProps> = ({ result, resultId, onPublicSta
                 )}
               </span>
             </button>
+
+            {/* Anonymous User Notice */}
+            {!user && (
+              <div className="px-4 py-3 mt-2 mx-2 text-xs bg-blue-50 border border-blue-200 rounded text-blue-700">
+                <div className="flex items-start gap-2">
+                  <span className="text-blue-600 mt-0.5">ℹ️</span>
+                  <div className="flex-1">
+                    <p className="text-blue-700">
+                      <strong>Anonymous Analysis:</strong> To share your results publicly, please sign in to your account.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Error Display */}
             {imageGenerationError && (
