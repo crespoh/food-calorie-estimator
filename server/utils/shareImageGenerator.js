@@ -1,7 +1,12 @@
-const { createCanvas, loadImage, registerFont } = require('canvas');
-const QRCode = require('qrcode');
-const path = require('path');
-const fs = require('fs');
+import { createCanvas, loadImage, registerFont } from 'canvas';
+import QRCode from 'qrcode';
+import path from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
+
+// ES module dirname equivalent
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Register custom fonts if available
 const fontPath = path.join(__dirname, '../assets/fonts');
@@ -122,4 +127,4 @@ const generateAndStoreSocialImage = async (result, platform = 'default') => {
   return canvas.toBuffer('image/png');
 };
 
-module.exports = { generateAndStoreSocialImage };
+export { generateAndStoreSocialImage };
