@@ -38,11 +38,17 @@ const ShareButton: React.FC<ShareButtonProps> = ({ result, resultId, onPublicSta
   const [imageGenerationProgress, setImageGenerationProgress] = useState<string>('');
   const { user } = useAuth();
 
+  // Debug logging for props
+  console.log('🔍 ShareButton props:', { resultId, hasResult: !!result, user: !!user });
+
   // Sync isPublic state with result.is_public
   useEffect(() => {
+    console.log('🔄 ShareButton useEffect triggered, result.is_public:', result?.is_public);
     if (result && typeof result.is_public === 'boolean') {
       console.log('🔄 ShareButton: Syncing isPublic state with result.is_public:', result.is_public);
       setIsPublic(result.is_public);
+    } else {
+      console.log('⚠️ ShareButton: Cannot sync isPublic, result:', result, 'result.is_public:', result?.is_public);
     }
   }, [result?.is_public]);
 
@@ -62,11 +68,15 @@ const ShareButton: React.FC<ShareButtonProps> = ({ result, resultId, onPublicSta
 
   // Generate share image with timeout and better error handling
   const generateShareImageWithTimeout = async (platform: string = 'default', setLoadingState?: (loading: boolean) => void) => {
-    if (!resultId) return null;
+    if (!resultId) {
+      console.log('❌ No resultId provided for image generation');
+      return null;
+    }
     
     const timeoutMs = 15000; // 15 second timeout
     setImageGenerationError(null);
     setImageGenerationProgress('Starting image generation...');
+    console.log('🖼️ Starting image generation for platform:', platform, 'resultId:', resultId);
     
     if (setLoadingState) {
       setLoadingState(true);
@@ -75,54 +85,78 @@ const ShareButton: React.FC<ShareButtonProps> = ({ result, resultId, onPublicSta
     }
     
     try {
+      console.log('🔑 Getting Supabase session...');
       const { data: { session } } = await supabase.auth.getSession();
       const accessToken = session?.access_token;
+      console.log('🔑 Session obtained, accessToken exists:', !!accessToken);
       
       setImageGenerationProgress('Creating image...');
+      console.log('🌐 Preparing API request...');
       
       const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+      console.log('🌐 API Base URL:', apiBase);
       
       // Create a timeout promise
       const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('Image generation timed out')), timeoutMs);
+        setTimeout(() => {
+          console.log('⏰ Image generation timed out after', timeoutMs, 'ms');
+          reject(new Error('Image generation timed out'));
+        }, timeoutMs);
       });
       
       // Create the fetch promise
+      const requestBody = {
+        resultId,
+        platform,
+      };
+      console.log('📤 Request body:', requestBody);
+      
       const fetchPromise = fetch(`${apiBase}/generate-share-image`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           ...(accessToken && { Authorization: `Bearer ${accessToken}` }),
         },
-        body: JSON.stringify({
-          resultId,
-          platform,
-        }),
+        body: JSON.stringify(requestBody),
       });
       
+      console.log('🚀 Starting fetch request...');
       // Race between fetch and timeout
       const response = await Promise.race([fetchPromise, timeoutPromise]) as Response;
+      console.log('📥 Response received, status:', response.status, 'ok:', response.ok);
       
       if (!response.ok) {
-        throw new Error(`Server error: ${response.status}`);
+        const errorText = await response.text();
+        console.error('❌ Server error response:', errorText);
+        throw new Error(`Server error: ${response.status} - ${errorText}`);
       }
       
       setImageGenerationProgress('Processing response...');
+      console.log('📋 Parsing response JSON...');
       const data = await response.json();
+      console.log('📋 Response data:', data);
       
       if (data.success) {
         setImageGenerationProgress('Image ready!');
+        console.log('✅ Image generation successful, URL:', data.imageUrl);
         setShareImageUrl(data.imageUrl);
         return data.imageUrl;
       } else {
+        console.error('❌ API returned success: false, error:', data.error);
         throw new Error(data.error || 'Failed to generate image');
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-      console.error('Failed to generate share image:', error);
+      console.error('❌ Failed to generate share image:', error);
+      console.error('❌ Error details:', {
+        message: errorMessage,
+        stack: error instanceof Error ? error.stack : 'No stack trace',
+        error: error
+      });
       setImageGenerationError(errorMessage);
       throw error;
     } finally {
+      console.log('🧹 Cleaning up image generation state...');
       if (setLoadingState) {
         setLoadingState(false);
       } else {
@@ -135,6 +169,14 @@ const ShareButton: React.FC<ShareButtonProps> = ({ result, resultId, onPublicSta
   // Enhanced share handlers with image generation
   const handleTwitterShare = async () => {
     console.log('🐦 Twitter share clicked, isPublic:', isPublic, 'result.is_public:', result.is_public);
+    console.log('🔍 Twitter share - resultId:', resultId, 'type:', typeof resultId);
+    
+    if (!resultId) {
+      console.error('❌ No resultId provided for Twitter share');
+      setImageGenerationError('No result ID available for sharing');
+      return;
+    }
+    
     if (!isPublic) {
       alert('Please make this result public before sharing');
       return;
@@ -144,35 +186,52 @@ const ShareButton: React.FC<ShareButtonProps> = ({ result, resultId, onPublicSta
     // so Twitter can see it when crawling the URL
     setGeneratingImage(true);
     setImageGenerationError(null);
+    console.log('🔄 Starting Twitter share process...');
     
     try {
+      console.log('🖼️ Attempting to generate image for Twitter...');
       // Generate the image first to ensure it's available for Twitter
-      await generateShareImageWithTimeout('twitter');
+      const imageUrl = await generateShareImageWithTimeout('twitter');
+      console.log('✅ Image generated successfully:', imageUrl);
       
       // Small delay to ensure the image is fully uploaded and accessible
       setImageGenerationProgress('Finalizing...');
+      console.log('⏳ Waiting for image to be fully accessible...');
       await new Promise(resolve => setTimeout(resolve, 1000));
       
       // Now open Twitter with the URL that has the image ready
       const ogUrl = `${import.meta.env.VITE_API_URL?.replace('/api', '')}/og/${resultId}`;
       const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(ogUrl)}`;
+      console.log('🌐 Opening Twitter with URL:', ogUrl);
+      console.log('🐦 Twitter intent URL:', twitterUrl);
       window.open(twitterUrl, '_blank');
       logShareEvent('twitter');
       setIsOpen(false);
+      console.log('✅ Twitter share completed successfully');
     } catch (error) {
-      console.error('Failed to generate Twitter share image:', error);
-      setImageGenerationError('Image generation failed, but you can still share!');
+      console.error('❌ Failed to generate Twitter share image:', error);
+      console.error('❌ Error details:', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : 'No stack trace',
+        error: error
+      });
+      
+      setImageGenerationError(`Image generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
       
       // Show error message briefly, then open Twitter
+      console.log('🔄 Falling back to Twitter without image...');
       setTimeout(() => {
         const ogUrl = `${import.meta.env.VITE_API_URL?.replace('/api', '')}/og/${resultId}`;
         const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(ogUrl)}`;
+        console.log('🌐 Fallback: Opening Twitter with URL:', ogUrl);
         window.open(twitterUrl, '_blank');
         logShareEvent('twitter');
         setIsOpen(false);
         setImageGenerationError(null);
+        console.log('✅ Twitter share completed with fallback');
       }, 2000);
     } finally {
+      console.log('🧹 Cleaning up Twitter share state...');
       setGeneratingImage(false);
       setImageGenerationProgress('');
     }
