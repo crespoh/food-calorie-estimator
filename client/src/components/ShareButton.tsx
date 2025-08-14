@@ -94,11 +94,14 @@ const ShareButton: React.FC<ShareButtonProps> = ({ result, resultId, onPublicSta
   const shareText = `🍽️ Just analyzed my food with AI! Found ${foodItemsText} - ${result.totalCalories} calories total. Check out this amazing CaloriTrack app!`;
   
   // Create shareable link (for public result viewing)
-  // Use custom domain if available, otherwise fallback to current origin
+  // Use custom domain for user-facing links
   const customDomain = 'https://calorie.codedcheese.com';
   const shareableLink = resultId && isPublic
     ? `${customDomain}/result/${resultId}`
     : customDomain;
+    
+  // Use Railway URL for OG endpoints (social media crawlers)
+  const ogBaseUrl = import.meta.env.VITE_API_URL?.replace('/api', '') || 'https://caloritrack-production.up.railway.app';
 
   // Generate share image (legacy function for backward compatibility)
   const generateShareImage = async (platform: string = 'default', setLoadingState?: (loading: boolean) => void) => {
@@ -255,7 +258,7 @@ const ShareButton: React.FC<ShareButtonProps> = ({ result, resultId, onPublicSta
       await new Promise(resolve => setTimeout(resolve, 1000));
       
       // Now open Twitter with the URL that has the image ready
-      const ogUrl = `${customDomain}/og/${resultId}`;
+      const ogUrl = `${ogBaseUrl}/og/${resultId}`;
       const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(ogUrl)}`;
       console.log('🌐 Opening Twitter with URL:', ogUrl);
       console.log('🐦 Twitter intent URL:', twitterUrl);
@@ -280,7 +283,7 @@ const ShareButton: React.FC<ShareButtonProps> = ({ result, resultId, onPublicSta
       // Show error message briefly, then open Twitter
       console.log('🔄 Falling back to Twitter without image...');
       setTimeout(() => {
-        const ogUrl = `${customDomain}/og/${resultId}`;
+        const ogUrl = `${ogBaseUrl}/og/${resultId}`;
         const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(ogUrl)}`;
         console.log('🌐 Fallback: Opening Twitter with URL:', ogUrl);
         
@@ -327,7 +330,7 @@ const ShareButton: React.FC<ShareButtonProps> = ({ result, resultId, onPublicSta
       await new Promise(resolve => setTimeout(resolve, 1000));
       
       // Now open Reddit with the URL that has the image ready
-      const ogUrl = `${customDomain}/og/${resultId}`;
+      const ogUrl = `${ogBaseUrl}/og/${resultId}`;
       const redditUrl = `https://reddit.com/submit?url=${encodeURIComponent(ogUrl)}&title=${encodeURIComponent(shareText)}`;
       
       // Use mobile-specific sharing utility
@@ -341,7 +344,7 @@ const ShareButton: React.FC<ShareButtonProps> = ({ result, resultId, onPublicSta
       
               // Show error message briefly, then open Reddit
         setTimeout(() => {
-          const ogUrl = `${customDomain}/og/${resultId}`;
+          const ogUrl = `${ogBaseUrl}/og/${resultId}`;
           const redditUrl = `https://reddit.com/submit?url=${encodeURIComponent(ogUrl)}&title=${encodeURIComponent(shareText)}`;
         window.open(redditUrl, '_blank');
         logShareEvent('reddit');
@@ -378,7 +381,7 @@ const ShareButton: React.FC<ShareButtonProps> = ({ result, resultId, onPublicSta
         const shareData: any = {
           title: 'CaloriTrack Analysis',
           text: shareText,
-          url: `${customDomain}/og/${resultId}`,
+          url: `${ogBaseUrl}/og/${resultId}`,
         };
         
         // Try to add image file if supported and available
@@ -643,7 +646,7 @@ const ShareButton: React.FC<ShareButtonProps> = ({ result, resultId, onPublicSta
                     <p className="text-yellow-700">{imageGenerationError}</p>
                     <button
                       onClick={() => {
-                                              const ogUrl = `${customDomain}/og/${resultId}`;
+                                              const ogUrl = `${ogBaseUrl}/og/${resultId}`;
                       const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(ogUrl)}`;
                         
                         // Use mobile-specific sharing utility
