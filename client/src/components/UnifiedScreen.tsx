@@ -827,7 +827,15 @@ const UnifiedScreen: React.FC = () => {
                   >
                     📋 {copySuccess ? copySuccess : 'Copy Result'}
                   </button>
-                  <ShareButton result={result} resultId={currentResultId || undefined} />
+                  <ShareButton 
+                    result={result} 
+                    resultId={currentResultId || undefined} 
+                    onPublicStatusChange={(isPublic) => {
+                      if (result) {
+                        setResult({ ...result, is_public: isPublic });
+                      }
+                    }}
+                  />
                 </div>
 
                 {/* Feedback Section */}

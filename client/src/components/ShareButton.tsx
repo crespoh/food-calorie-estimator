@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Share2, Twitter, MessageCircle, Link, Copy, Check, Download, Eye } from 'lucide-react';
 import { useAuth } from '../AuthContext';
 import { supabase } from '../supabaseClient';
@@ -20,9 +20,10 @@ interface ShareButtonProps {
     is_public?: boolean;
   };
   resultId?: string;
+  onPublicStatusChange?: (isPublic: boolean) => void;
 }
 
-const ShareButton: React.FC<ShareButtonProps> = ({ result, resultId }) => {
+const ShareButton: React.FC<ShareButtonProps> = ({ result, resultId, onPublicStatusChange }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const [isPublic, setIsPublic] = useState(false);
@@ -32,6 +33,14 @@ const ShareButton: React.FC<ShareButtonProps> = ({ result, resultId }) => {
   const [generatingImage, setGeneratingImage] = useState(false);
   const [showImagePreview, setShowImagePreview] = useState(false);
   const { user } = useAuth();
+
+  // Sync isPublic state with result.is_public
+  useEffect(() => {
+    if (result && typeof result.is_public === 'boolean') {
+      console.log('🔄 ShareButton: Syncing isPublic state with result.is_public:', result.is_public);
+      setIsPublic(result.is_public);
+    }
+  }, [result?.is_public]);
 
   // Construct share text
   const foodItemsText = result.foodItems.join(', ');
@@ -79,7 +88,8 @@ const ShareButton: React.FC<ShareButtonProps> = ({ result, resultId }) => {
 
   // Enhanced share handlers with image generation
   const handleTwitterShare = async () => {
-    if (!result.is_public) {
+    console.log('🐦 Twitter share clicked, isPublic:', isPublic, 'result.is_public:', result.is_public);
+    if (!isPublic) {
       alert('Please make this result public before sharing');
       return;
     }
@@ -93,7 +103,8 @@ const ShareButton: React.FC<ShareButtonProps> = ({ result, resultId }) => {
   };
 
   const handleRedditShare = async () => {
-    if (!result.is_public) {
+    console.log('🔴 Reddit share clicked, isPublic:', isPublic, 'result.is_public:', result.is_public);
+    if (!isPublic) {
       alert('Please make this result public before sharing');
       return;
     }
@@ -217,10 +228,16 @@ const ShareButton: React.FC<ShareButtonProps> = ({ result, resultId }) => {
       });
       
       if (response.ok) {
-        setIsPublic(!isPublic);
+        const newPublicStatus = !isPublic;
+        setIsPublic(newPublicStatus);
         setShowPublicStatus(true);
         setTimeout(() => setShowPublicStatus(false), 3000);
-        console.log(`✅ Result ${!isPublic ? 'made public' : 'made private'} successfully`);
+        console.log(`✅ Result ${newPublicStatus ? 'made public' : 'made private'} successfully`);
+        
+        // Notify parent component of the change
+        if (onPublicStatusChange) {
+          onPublicStatusChange(newPublicStatus);
+        }
       } else {
         console.error('❌ Failed to update result visibility');
       }
