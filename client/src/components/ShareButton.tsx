@@ -38,8 +38,45 @@ const ShareButton: React.FC<ShareButtonProps> = ({ result, resultId, onPublicSta
   const [imageGenerationProgress, setImageGenerationProgress] = useState<string>('');
   const { user } = useAuth();
 
-  // Debug logging for props
-  console.log('🔍 ShareButton props:', { resultId, hasResult: !!result, user: !!user });
+  // Mobile detection utility
+  const isMobileDevice = () => {
+    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+  };
+
+  // Mobile-specific social sharing
+  const openSocialApp = (platform: 'twitter' | 'reddit', url: string, text: string) => {
+    const isMobile = isMobileDevice();
+    console.log('📱 Device type:', isMobile ? 'Mobile' : 'Desktop');
+    
+    if (isMobile) {
+      try {
+        let appUrl: string;
+        if (platform === 'twitter') {
+          appUrl = `twitter://post?message=${encodeURIComponent(text + ' ' + url)}`;
+        } else {
+          appUrl = `reddit://submit?url=${encodeURIComponent(url)}&title=${encodeURIComponent(text)}`;
+        }
+        
+        window.location.href = appUrl;
+        
+        // Fallback to web if app doesn't open
+        setTimeout(() => {
+          window.location.href = url;
+        }, 1000);
+      } catch (error) {
+        console.log(`📱 ${platform} app not available, using web fallback`);
+        window.location.href = url;
+      }
+    } else {
+      // Desktop: use window.open
+      window.open(url, '_blank');
+    }
+  };
+
+  // Debug logging for props (only log when props change)
+  useEffect(() => {
+    console.log('🔍 ShareButton props updated:', { resultId, hasResult: !!result, user: !!user });
+  }, [resultId, result, user]);
 
   // Sync isPublic state with result.is_public
   useEffect(() => {
@@ -214,7 +251,10 @@ const ShareButton: React.FC<ShareButtonProps> = ({ result, resultId, onPublicSta
       const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(ogUrl)}`;
       console.log('🌐 Opening Twitter with URL:', ogUrl);
       console.log('🐦 Twitter intent URL:', twitterUrl);
-      window.open(twitterUrl, '_blank');
+      
+      // Use mobile-specific sharing utility
+      openSocialApp('twitter', twitterUrl, shareText);
+      
       logShareEvent('twitter');
       setIsOpen(false);
       console.log('✅ Twitter share completed successfully');
@@ -235,7 +275,10 @@ const ShareButton: React.FC<ShareButtonProps> = ({ result, resultId, onPublicSta
         const ogUrl = `${import.meta.env.VITE_API_URL?.replace('/api', '')}/og/${resultId}`;
         const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(ogUrl)}`;
         console.log('🌐 Fallback: Opening Twitter with URL:', ogUrl);
-        window.open(twitterUrl, '_blank');
+        
+        // Use mobile-specific sharing utility
+        openSocialApp('twitter', twitterUrl, shareText);
+        
         logShareEvent('twitter');
         setIsOpen(false);
         setImageGenerationError(null);
@@ -271,7 +314,10 @@ const ShareButton: React.FC<ShareButtonProps> = ({ result, resultId, onPublicSta
       // Now open Reddit with the URL that has the image ready
       const ogUrl = `${import.meta.env.VITE_API_URL?.replace('/api', '')}/og/${resultId}`;
       const redditUrl = `https://reddit.com/submit?url=${encodeURIComponent(ogUrl)}&title=${encodeURIComponent(shareText)}`;
-      window.open(redditUrl, '_blank');
+      
+      // Use mobile-specific sharing utility
+      openSocialApp('reddit', redditUrl, shareText);
+      
       logShareEvent('reddit');
       setIsOpen(false);
     } catch (error) {
@@ -551,7 +597,10 @@ const ShareButton: React.FC<ShareButtonProps> = ({ result, resultId, onPublicSta
                     onClick={() => {
                       const ogUrl = `${import.meta.env.VITE_API_URL?.replace('/api', '')}/og/${resultId}`;
                       const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(ogUrl)}`;
-                      window.open(twitterUrl, '_blank');
+                      
+                      // Use mobile-specific sharing utility
+                      openSocialApp('twitter', twitterUrl, shareText);
+                      
                       logShareEvent('twitter');
                       setIsOpen(false);
                       setImageGenerationError(null);
