@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1350" viewBox="0 0 1080 1350">
+  <defs>
+    <linearGradient id="bgGradLight" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#FAFAFB"/>
+      <stop offset="100%" stop-color="#F1F2F3"/>
+    </linearGradient>
+    <style><![CDATA[
+      .font-sans { font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "Liberation Sans", "DejaVu Sans", sans-serif; }
+      .logo { fill: #0B0C10; opacity: 0.92; }
+      .headline { fill: #0B0C10; font-weight: 800; font-size: 96px; line-height: 1.08; }
+      .subheadline { fill: #4B4F58; font-weight: 600; font-size: 56px; line-height: 1.15; }
+      .meta-pill-bg { fill: #E9EDF3; }
+      .meta-text { fill: #4B4F58; font-weight: 700; font-size: 32px; letter-spacing: 0.3px; }
+      .accent { fill: #5B8CFF; }
+    ]]></style>
+  </defs>
+
+  <!-- Background -->
+  <rect x="0" y="0" width="1080" height="1350" fill="url(#bgGradLight)"/>
+
+  <!-- Accent keyline (top) -->
+  <rect x="0" y="0" width="1080" height="6" class="accent"/>
+
+  <!-- Safe area: 10% horizontal (108), 10% vertical (135) -->
+  <g id="safe" transform="translate(108,135)">
+    <!-- Logo placeholder (monochrome) -->
+    <g transform="translate(0,0)">
+      <rect x="0" y="0" width="40" height="40" rx="8" class="logo"/>
+    </g>
+
+    <!-- Headline -->
+    <g transform="translate(0,88)">
+      <text class="font-sans headline" x="0" y="0">
+        <tspan x="0" dy="0">Ship features,</tspan>
+        <tspan x="0" dy="110">not screenshots</tspan>
+      </text>
+    </g>
+
+    <!-- Subheadline -->
+    <g transform="translate(0,330)">
+      <text class="font-sans subheadline" x="0" y="0">A minimalist release update template</text>
+    </g>
+
+    <!-- Metadata pill (bottom-left) -->
+    <g transform="translate(0,980)">
+      <!-- Pill background -->
+      <rect x="0" y="0" width="520" height="56" rx="12" class="meta-pill-bg"/>
+      <!-- Bullet -->
+      <circle cx="24" cy="28" r="6" class="accent"/>
+      <!-- Text -->
+      <text class="font-sans meta-text" x="44" y="36">Announcement · Sep 2025</text>
+    </g>
+  </g>
+</svg>
+
