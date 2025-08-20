@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Minimalist Social Image Previews</title>
+  <style>
+    :root {
+      --bg: #0f1115;
+      --text: #e6e9ef;
+      --muted: #a0a6b4;
+      --gap: 24px;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+      background: var(--bg);
+      color: var(--text);
+    }
+    header {
+      padding: 24px clamp(16px, 4vw, 40px);
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+    header h1 { font-size: 18px; margin: 0 0 6px 0; }
+    header p { margin: 0; color: var(--muted); font-size: 14px; }
+    main {
+      padding: clamp(16px, 4vw, 40px);
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: var(--gap);
+      align-items: start;
+    }
+    .card {
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 16px;
+      padding: 16px;
+    }
+    .label {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 12px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .preview {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #0b0c10;
+      border-radius: 12px;
+      overflow: hidden;
+      aspect-ratio: 1080 / 1350;
+      width: 100%;
+    }
+    .preview.light { background: #f6f7f9; }
+    .preview img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      display: block;
+    }
+    footer { color: var(--muted); font-size: 12px; padding: 24px clamp(16px, 4vw, 40px); }
+  </style>
+  <meta name="color-scheme" content="dark light" />
+  <link rel="icon" href="data:," />
+  <meta name="robots" content="noindex, nofollow" />
+  <meta name="description" content="Preview page for minimalist social image SVGs" />
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="Minimalist Social Image Previews" />
+  <meta property="og:description" content="Dark and light variants, portrait 1080×1350" />
+</head>
+<body>
+  <header>
+    <h1>Minimalist Social Image Previews</h1>
+    <p>Two variants at 1080×1350. Open this file in a browser for the most accurate rendering.</p>
+  </header>
+  <main>
+    <div class="grid">
+      <div class="card">
+        <div class="label">
+          <span>Dark · 1080×1350</span>
+          <a href="./minimalist_social_portrait_dark.svg" target="_blank" rel="noreferrer noopener" style="color: #9bb2ff; text-decoration: none;">Open raw</a>
+        </div>
+        <div class="preview">
+          <img src="./minimalist_social_portrait_dark.svg" alt="Dark minimalist social image preview" />
+        </div>
+      </div>
+      <div class="card">
+        <div class="label">
+          <span>Light · 1080×1350</span>
+          <a href="./minimalist_social_portrait_light.svg" target="_blank" rel="noreferrer noopener" style="color: #9bb2ff; text-decoration: none;">Open raw</a>
+        </div>
+        <div class="preview light">
+          <img src="./minimalist_social_portrait_light.svg" alt="Light minimalist social image preview" />
+        </div>
+      </div>
+    </div>
+  </main>
+  <footer>
+    Tip: Right-click an image and “Save image as…” to export as standalone SVG. Use your browser’s print-to-PDF or a design tool if you need PNGs.
+  </footer>
+  <script>
+    // Ensure the page scales well within preview panes
+    (function() {
+      const setVH = () => document.documentElement.style.setProperty('--vh', `${window.innerHeight * 0.01}px`);
+      setVH();
+      window.addEventListener('resize', setVH);
+    })();
+  </script>
+  
+</body>
+</html>
+
