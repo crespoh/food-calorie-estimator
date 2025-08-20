@@ -156,20 +156,18 @@ const ShareButton: React.FC<ShareButtonProps> = ({ result, resultId, onPublicSta
         }, timeoutMs);
       });
       
-      // Create the fetch promise
-      const requestBody = {
-        resultId,
-        platform,
-      };
-      console.log('📤 Request body:', requestBody);
+      // Use new v2 endpoint
+      const variant = platform === 'twitter' ? 'photo' : 'light';
+      const imageUrl = `${apiBase.replace('/api', '')}/og/food/${resultId}.png?variant=${variant}`;
       
-      const fetchPromise = fetch(`${apiBase}/generate-share-image`, {
-        method: 'POST',
+      console.log('🚀 Using v2 endpoint:', imageUrl);
+      
+      // Simple fetch to trigger image generation
+      const fetchPromise = fetch(imageUrl, {
+        method: 'GET',
         headers: {
-          'Content-Type': 'application/json',
           ...(accessToken && { Authorization: `Bearer ${accessToken}` }),
         },
-        body: JSON.stringify(requestBody),
       });
       
       console.log('🚀 Starting fetch request...');
@@ -183,20 +181,10 @@ const ShareButton: React.FC<ShareButtonProps> = ({ result, resultId, onPublicSta
         throw new Error(`Server error: ${response.status} - ${errorText}`);
       }
       
-      setImageGenerationProgress('Processing response...');
-      console.log('📋 Parsing response JSON...');
-      const data = await response.json();
-      console.log('📋 Response data:', data);
-      
-      if (data.success) {
-        setImageGenerationProgress('Image ready!');
-        console.log('✅ Image generation successful, URL:', data.imageUrl);
-        setShareImageUrl(data.imageUrl);
-        return data.imageUrl;
-      } else {
-        console.error('❌ API returned success: false, error:', data.error);
-        throw new Error(data.error || 'Failed to generate image');
-      }
+      setImageGenerationProgress('Image ready!');
+      console.log('✅ Image generation successful, URL:', imageUrl);
+      setShareImageUrl(imageUrl);
+      return imageUrl;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
       console.error('❌ Failed to generate share image:', error);

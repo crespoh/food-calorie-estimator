@@ -9,6 +9,7 @@ import { createClient } from '@supabase/supabase-js';
 import { analyzeImage } from './utils/llmDispatcher.js';
 import { checkAndRecordUpload } from './utils/uploadLimiter.js';
 import { generateAndStoreSocialImage } from './utils/shareImageGenerator.js';
+import { generateAndStoreShareCardV2 } from './utils/shareImageGeneratorV2.js';
 
 // ES module dirname equivalent
 const __filename = fileURLToPath(import.meta.url);
@@ -899,32 +900,8 @@ app.get('/og/:resultId', async (req, res) => {
     let socialImageUrl = result.social_image_url;
     if (!socialImageUrl) {
       try {
-        const imageBuffer = await generateAndStoreSocialImage(result);
-        const fileName = `share-images/${result.id}-default-${Date.now()}.png`;
-        
-        const { data: uploadData, error: uploadError } = await supabase.storage
-          .from('public-assets')
-          .upload(fileName, imageBuffer, {
-            contentType: 'image/png',
-            cacheControl: '3600'
-          });
-        
-        if (!uploadError) {
-          const { data: { publicUrl } } = supabase.storage
-            .from('public-assets')
-            .getPublicUrl(fileName);
-          
-          socialImageUrl = publicUrl;
-          
-          // Update result with social image URL
-          await supabase
-            .from('calorie_results')
-            .update({ 
-              social_image_url: socialImageUrl,
-              social_image_generated_at: new Date().toISOString()
-            })
-            .eq('id', resultId);
-        }
+        // Use new share card v2
+        socialImageUrl = await generateAndStoreShareCardV2(result, 'photo');
       } catch (error) {
         console.error('Failed to generate social image:', error);
         socialImageUrl = `${process.env.FRONTEND_URL || 'https://calorie.codedcheese.com'}/assets/default-share-image.png`;
@@ -975,7 +952,46 @@ app.get('/og/:resultId', async (req, res) => {
   }
 });
 
-// Generate share image endpoint
+// Generate share card v2 endpoint
+app.get('/og/food/:resultId.png', async (req, res) => {
+  try {
+    const { resultId } = req.params;
+    const { variant = 'photo' } = req.query;
+    
+    // Validate variant
+    if (!['photo', 'light', 'dark'].includes(variant)) {
+      return res.status(400).json({ error: 'Invalid variant. Must be photo, light, or dark.' });
+    }
+    
+    // Fetch result data
+    const { data: result, error } = await supabase
+      .from('calorie_results')
+      .select('*')
+      .eq('id', resultId)
+      .eq('is_public', true)
+      .single();
+    
+    if (error || !result) {
+      return res.status(404).json({ error: 'Result not found or not public' });
+    }
+    
+    // Generate share card v2
+    const imageUrl = await generateAndStoreShareCardV2(result, variant);
+    
+    // Set cache headers
+    res.setHeader('Cache-Control', 'public, max-age=3600, s-maxage=86400');
+    res.setHeader('Content-Type', 'image/png');
+    
+    // Redirect to the generated image
+    res.redirect(imageUrl);
+    
+  } catch (error) {
+    console.error('Share card v2 generation error:', error);
+    res.status(500).json({ error: 'Failed to generate share card' });
+  }
+});
+
+// Generate share image endpoint (legacy)
 app.post('/api/generate-share-image', async (req, res) => {
   try {
     const { resultId, platform = 'default' } = req.body;
