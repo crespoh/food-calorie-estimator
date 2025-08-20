@@ -328,7 +328,7 @@ const generateShareCardV2 = async (data, variant = 'photo') => {
     CARBS: carbsG || 0,
     FAT: fatG || 0,
     BRAND_DOMAIN: brandDomain,
-    BACKGROUND: imageUrl ? generatePhotoOverlay(imageUrl) : '<rect x="0" y="0" width="1200" height="630" fill="url(#bgPhoto)"/>',
+    BACKGROUND: imageUrl ? '' : '<rect x="0" y="0" width="1200" height="630" fill="url(#bgPhoto)"/>', // Remove photo overlay from SVG
     CONFIDENCE_CHIP: generateConfidenceChip(confidencePct)
   };
 
@@ -342,12 +342,43 @@ const generateShareCardV2 = async (data, variant = 'photo') => {
   const canvas = createCanvas(1200, 630);
   const ctx = canvas.getContext('2d');
 
-  // Create a data URL from SVG
-  const svgDataUrl = 'data:image/svg+xml;base64,' + Buffer.from(svg).toString('base64');
-  
-  // Load SVG as image
-  const img = await loadImage(svgDataUrl);
-  ctx.drawImage(img, 0, 0, 1200, 630);
+  // If we have an image URL, load and draw it first
+  if (imageUrl && variant === 'photo') {
+    try {
+      console.log('🖼️ Loading food image:', imageUrl);
+      const foodImage = await loadImage(imageUrl);
+      ctx.drawImage(foodImage, 0, 0, 1200, 630);
+      console.log('✅ Food image loaded successfully');
+    } catch (error) {
+      console.log('⚠️ Failed to load food image, using gradient background:', error.message);
+      // Draw gradient background as fallback
+      const gradient = ctx.createLinearGradient(0, 0, 1200, 630);
+      gradient.addColorStop(0, '#F4C77E');
+      gradient.addColorStop(1, '#D96A6B');
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, 1200, 630);
+    }
+  } else {
+    // Create a data URL from SVG
+    const svgDataUrl = 'data:image/svg+xml;base64,' + Buffer.from(svg).toString('base64');
+    
+    // Load SVG as image
+    const img = await loadImage(svgDataUrl);
+    ctx.drawImage(img, 0, 0, 1200, 630);
+  }
+
+  // If we have a food image, overlay the SVG content on top
+  if (imageUrl && variant === 'photo') {
+    // Create SVG without the background (just the overlays and text)
+    const overlaySvg = svg.replace(/<rect[^>]*fill="url\(#bgPhoto\)"[^>]*\/>/g, ''); // Remove background rect
+    
+    // Create a data URL from the overlay SVG
+    const overlaySvgDataUrl = 'data:image/svg+xml;base64,' + Buffer.from(overlaySvg).toString('base64');
+    
+    // Load overlay SVG as image
+    const overlayImg = await loadImage(overlaySvgDataUrl);
+    ctx.drawImage(overlayImg, 0, 0, 1200, 630);
+  }
 
   // Return buffer
   return canvas.toBuffer('image/png');
