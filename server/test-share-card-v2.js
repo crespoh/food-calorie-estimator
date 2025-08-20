@@ -15,7 +15,7 @@ const sampleData = {
   carbsG: 22,
   fatG: 28,
   confidencePct: 7,
-  imageUrl: null, // No image for this test
+  imageUrl: null, // No image for testing - will use gradient background
   brandDomain: 'calorie.codedcheese.com',
   locale: 'en'
 };

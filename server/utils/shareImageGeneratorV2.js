@@ -45,11 +45,8 @@ const SVG_TEMPLATES = {
     ]]></style>
   </defs>
 
-  <!-- Background with photo or gradient -->
-  <rect x="0" y="0" width="1200" height="630" fill="url(#bgPhoto)"/>
-  
-  <!-- Photo overlay if available -->
-  {{PHOTO_OVERLAY}}
+  <!-- Background: Photo if available, otherwise gradient -->
+  {{BACKGROUND}}
 
   <!-- Abstract food illustration (circles, leaves, highlights) -->
   <g opacity="0.6">
@@ -288,12 +285,7 @@ const generateConfidenceChip = (confidencePct) => {
 const generatePhotoOverlay = (imageUrl) => {
   if (!imageUrl) return '';
   
-  return `<defs>
-    <pattern id="photoPattern" patternUnits="userSpaceOnUse" width="1200" height="630">
-      <image href="${imageUrl}" width="1200" height="630" preserveAspectRatio="xMidYMid slice"/>
-    </pattern>
-  </defs>
-  <rect x="0" y="0" width="1200" height="630" fill="url(#photoPattern)"/>`;
+  return `<image href="${imageUrl}" x="0" y="0" width="1200" height="630" preserveAspectRatio="xMidYMid slice"/>`;
 };
 
 // Main function to generate share card v2
@@ -318,11 +310,9 @@ const generateShareCardV2 = async (data, variant = 'photo') => {
 
   // Determine which template to use
   let template;
-  let photoOverlay = '';
 
-  if (variant === 'photo' && imageUrl) {
+  if (variant === 'photo') {
     template = SVG_TEMPLATES.withPhoto;
-    photoOverlay = generatePhotoOverlay(imageUrl);
   } else if (variant === 'light') {
     template = SVG_TEMPLATES.noPhotoLight;
   } else {
@@ -338,7 +328,7 @@ const generateShareCardV2 = async (data, variant = 'photo') => {
     CARBS: carbsG || 0,
     FAT: fatG || 0,
     BRAND_DOMAIN: brandDomain,
-    PHOTO_OVERLAY: photoOverlay,
+    BACKGROUND: imageUrl ? generatePhotoOverlay(imageUrl) : '<rect x="0" y="0" width="1200" height="630" fill="url(#bgPhoto)"/>',
     CONFIDENCE_CHIP: generateConfidenceChip(confidencePct)
   };
 
