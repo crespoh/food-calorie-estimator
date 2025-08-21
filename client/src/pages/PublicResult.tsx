@@ -275,7 +275,7 @@ const PublicResult: React.FC = () => {
               </Link>
               <button
                 onClick={() => {
-                  const shareText = `🍽️ Check out this food analysis! Found ${result.food_items?.join(', ') || 'delicious food'} - ${result.total_calories} calories total. Try analyzing your own food at https://calorie.codedcheese.com`;
+                  const shareText = `🍽️ Food analysis: ${result.food_items?.join(', ') || 'meal'} — ${result.total_calories} kcal. Try it: https://calorie.codedcheese.com`;
                   navigator.clipboard.writeText(shareText);
                   trackPublicResultShare(result.id);
                   alert('Share text copied to clipboard!');
