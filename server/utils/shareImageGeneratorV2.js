@@ -347,7 +347,23 @@ const generateShareCardV2 = async (data, variant = 'photo') => {
     try {
       console.log('🖼️ Loading food image:', imageUrl);
       const foodImage = await loadImage(imageUrl);
-      ctx.drawImage(foodImage, 0, 0, 1200, 630);
+      // Draw the image using a "cover" strategy to preserve aspect ratio without distortion
+      // Similar to CSS object-fit: cover centered
+      const canvasWidth = 1200;
+      const canvasHeight = 630;
+      const imageWidth = foodImage.width;
+      const imageHeight = foodImage.height;
+
+      // Compute the scale that covers the entire canvas
+      const scale = Math.max(canvasWidth / imageWidth, canvasHeight / imageHeight);
+      const drawWidth = imageWidth * scale;
+      const drawHeight = imageHeight * scale;
+
+      // Center the image within the canvas
+      const dx = (canvasWidth - drawWidth) / 2;
+      const dy = (canvasHeight - drawHeight) / 2;
+
+      ctx.drawImage(foodImage, dx, dy, drawWidth, drawHeight);
       console.log('✅ Food image loaded successfully');
     } catch (error) {
       console.log('⚠️ Failed to load food image, using gradient background:', error.message);
