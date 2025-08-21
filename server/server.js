@@ -921,6 +921,7 @@ app.get('/og/:resultId', async (req, res) => {
           <meta property="og:title" content="CaloriTrack - ${foodItemsText}" />
           <meta property="og:description" content="${foodItemsText} - ${result.total_calories} calories total. Analyzed with AI-powered CaloriTrack!" />
           <meta property="og:image" content="${socialImageUrl}" />
+          <meta property="og:image:secure_url" content="${socialImageUrl}" />
           <meta property="og:image:width" content="1200" />
           <meta property="og:image:height" content="630" />
           <meta property="og:image:alt" content="CaloriTrack food analysis showing ${foodItemsText} with ${result.total_calories} calories" />
@@ -933,8 +934,10 @@ app.get('/og/:resultId', async (req, res) => {
           <meta name="twitter:title" content="CaloriTrack - ${foodItemsText}" />
           <meta name="twitter:description" content="${foodItemsText} - ${result.total_calories} calories total. Analyzed with AI-powered CaloriTrack!" />
           <meta name="twitter:image" content="${socialImageUrl}" />
+          <meta name="twitter:image:src" content="${socialImageUrl}" />
           <meta name="twitter:image:alt" content="CaloriTrack food analysis showing ${foodItemsText} with ${result.total_calories} calories" />
           <meta name="twitter:site" content="@caloritrack" />
+          <meta name="twitter:url" content="${process.env.FRONTEND_URL || 'https://calorie.codedcheese.com'}/result/${resultId}" />
           
           <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         </head>

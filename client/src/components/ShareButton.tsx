@@ -44,7 +44,7 @@ const ShareButton: React.FC<ShareButtonProps> = ({ result, resultId, onPublicSta
   };
 
   // Mobile-specific social sharing
-  const openSocialApp = (platform: 'twitter' | 'reddit', url: string, text: string) => {
+  const openSocialApp = (platform: 'twitter' | 'reddit', url: string, text: string, mobileLinkUrl?: string) => {
     const isMobile = isMobileDevice();
     console.log('📱 Device type:', isMobile ? 'Mobile' : 'Desktop');
     
@@ -52,9 +52,11 @@ const ShareButton: React.FC<ShareButtonProps> = ({ result, resultId, onPublicSta
       try {
         let appUrl: string;
         if (platform === 'twitter') {
-          appUrl = `twitter://post?message=${encodeURIComponent(text + ' ' + url)}`;
+          const linkForMobile = mobileLinkUrl || url;
+          appUrl = `twitter://post?message=${encodeURIComponent(text + ' ' + linkForMobile)}`;
         } else {
-          appUrl = `reddit://submit?url=${encodeURIComponent(url)}&title=${encodeURIComponent(text)}`;
+          const linkForMobile = mobileLinkUrl || url;
+          appUrl = `reddit://submit?url=${encodeURIComponent(linkForMobile)}&title=${encodeURIComponent(text)}`;
         }
         
         window.location.href = appUrl;
@@ -91,7 +93,7 @@ const ShareButton: React.FC<ShareButtonProps> = ({ result, resultId, onPublicSta
 
   // Construct share text
   const foodItemsText = result.foodItems.join(', ');
-  const shareText = `🍽️ Just analyzed my food with AI! Found ${foodItemsText} - ${result.totalCalories} calories total. Check out this amazing CaloriTrack app!`;
+  const shareText = `🍽️ ${foodItemsText} — ${result.totalCalories} kcal via CaloriTrack`;
   
   // Create shareable link (for public result viewing)
   // Use custom domain for user-facing links
@@ -252,7 +254,7 @@ const ShareButton: React.FC<ShareButtonProps> = ({ result, resultId, onPublicSta
       console.log('🐦 Twitter intent URL:', twitterUrl);
       
       // Use mobile-specific sharing utility
-      openSocialApp('twitter', twitterUrl, shareText);
+      openSocialApp('twitter', twitterUrl, shareText, ogUrl);
       
       logShareEvent('twitter');
       setIsOpen(false);
@@ -276,7 +278,7 @@ const ShareButton: React.FC<ShareButtonProps> = ({ result, resultId, onPublicSta
         console.log('🌐 Fallback: Opening Twitter with URL:', ogUrl);
         
         // Use mobile-specific sharing utility
-        openSocialApp('twitter', twitterUrl, shareText);
+        openSocialApp('twitter', twitterUrl, shareText, ogUrl);
         
         logShareEvent('twitter');
         setIsOpen(false);
@@ -322,7 +324,7 @@ const ShareButton: React.FC<ShareButtonProps> = ({ result, resultId, onPublicSta
       const redditUrl = `https://reddit.com/submit?url=${encodeURIComponent(ogUrl)}&title=${encodeURIComponent(shareText)}`;
       
       // Use mobile-specific sharing utility
-      openSocialApp('reddit', redditUrl, shareText);
+      openSocialApp('reddit', redditUrl, shareText, ogUrl);
       
       logShareEvent('reddit');
       setIsOpen(false);
@@ -638,7 +640,7 @@ const ShareButton: React.FC<ShareButtonProps> = ({ result, resultId, onPublicSta
                       const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(ogUrl)}`;
                         
                         // Use mobile-specific sharing utility
-                        openSocialApp('twitter', twitterUrl, shareText);
+                        openSocialApp('twitter', twitterUrl, shareText, ogUrl);
                         
                         logShareEvent('twitter');
                         setIsOpen(false);
